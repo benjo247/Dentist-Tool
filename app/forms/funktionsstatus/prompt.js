@@ -13,11 +13,23 @@ visit_reason (string): Grund des Besuches
 recent_treatment_dentist, recent_treatment_orthodontist, recent_treatment_doctor (boolean)
 previous_function_therapy (boolean), previous_function_therapy_type (string)
 head_neck_trauma (boolean)
-pain_head_left, pain_head_right (boolean): Kopfschmerzen
-pain_temples_left, pain_temples_right (boolean): Schläfen
-pain_ear_jaw_left, pain_ear_jaw_right (boolean): Ohr/Kiefergelenk
-pain_neck_left, pain_neck_right (boolean): Nacken
-pain_shoulder_left, pain_shoulder_right (boolean): Schulter
+pain_head_left, pain_head_right (boolean): Kopfschmerzen vorhanden ja/nein
+pain_head_vas_left, pain_head_vas_right (number 0-10): Schmerz-Intensität Kopf nach VAS
+pain_temples_left, pain_temples_right (boolean): Schläfen-Schmerzen ja/nein
+pain_temples_vas_left, pain_temples_vas_right (number 0-10): Intensität Schläfen
+pain_ear_jaw_left, pain_ear_jaw_right (boolean): Ohr/Kiefergelenk-Schmerzen ja/nein
+pain_ear_jaw_vas_left, pain_ear_jaw_vas_right (number 0-10): Intensität Ohr/Kiefergelenk
+pain_neck_left, pain_neck_right (boolean): Nacken-Schmerzen ja/nein
+pain_neck_vas_left, pain_neck_vas_right (number 0-10): Intensität Nacken
+pain_shoulder_left, pain_shoulder_right (boolean): Schulter-Schmerzen ja/nein
+pain_shoulder_vas_left, pain_shoulder_vas_right (number 0-10): Intensität Schulter
+
+WICHTIG bei Schmerzangaben mit Intensität:
+- "Kopfschmerz links Stärke 7" → pain_head_left: true UND pain_head_vas_left: 7
+- "Schläfen rechts VAS 4" → pain_temples_right: true UND pain_temples_vas_right: 4
+- "Nacken beidseits stark, etwa 8" → alle 4 Felder: pain_neck_left/right: true, pain_neck_vas_left/right: 8
+- "kein Kopfschmerz" → pain_head_left/right: false (keine VAS-Werte)
+- Wenn nur boolean genannt ohne Intensität: nur boolean setzen, VAS bleibt null
 pain_other (boolean), pain_other_location (string)
 pain_vas (number 0-10): Schmerzstärke
 pain_impact_vas (number 0-10): Beeinträchtigung
