@@ -133,6 +133,19 @@ export function FloatingDemoPanel({
                             <span className="text-slate-600"> · {entry.updates.length} Feld{entry.updates.length !== 1 ? 'er' : ''}</span>
                           )}
                         </div>
+                        {/* Detail-View der gesetzten Felder */}
+                        {entry.updates.length > 0 && (
+                          <div className="mt-1.5 bg-slate-50 rounded p-1.5 space-y-0.5 border border-slate-200">
+                            {entry.updates.map((u, i) => (
+                              <div key={i} className="flex justify-between items-center text-[10px] font-mono">
+                                <span className="text-slate-700 truncate pr-2">{u.field}</span>
+                                <span className="font-bold text-slate-900 flex-shrink-0">
+                                  {typeof u.value === 'object' ? JSON.stringify(u.value).slice(0, 30) : String(u.value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

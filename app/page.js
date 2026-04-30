@@ -156,6 +156,21 @@ export default function App() {
             formCopy.dynamic_occlusion = dyn;
           } else {
             formCopy[field] = value;
+            // Auto-Sync für Schmerz-VAS-Felder:
+            // Wenn z.B. pain_head_vas_left auf 7 gesetzt wird, auch pain_head_left = true setzen
+            const vasMatch = field.match(/^(pain_\w+)_vas_(left|right)$/);
+            if (vasMatch && typeof value === 'number' && value > 0) {
+              const boolField = `${vasMatch[1]}_${vasMatch[2]}`;
+              if (formCopy[boolField] !== true) {
+                formCopy[boolField] = true;
+              }
+            }
+            // Umgekehrt: Wenn Boolean auf false gesetzt wird, VAS auf null
+            const boolMatch = field.match(/^(pain_(?:head|temples|ear_jaw|neck|shoulder))_(left|right)$/);
+            if (boolMatch && value === false) {
+              const vasField = `${boolMatch[1]}_vas_${boolMatch[2]}`;
+              formCopy[vasField] = null;
+            }
           }
         });
         next[activeFormId] = formCopy;

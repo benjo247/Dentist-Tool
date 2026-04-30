@@ -225,6 +225,41 @@ function VASLegend() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// DEBUG-PANEL — zeigt welche relevanten Felder gefüllt sind
+// ═══════════════════════════════════════════════════════════════════
+function DebugPanel({ state }) {
+  const allFields = [
+    ...PAIN_REGIONS.flatMap(r => [r.baseField, r.vasField]),
+    ...MUSCLE_POINTS.map(p => p.field),
+  ];
+  const filledFields = allFields.filter(f => state[f] !== null && state[f] !== undefined);
+
+  if (filledFields.length === 0) {
+    return (
+      <div className="bg-amber-50 border border-amber-300 rounded-md p-2 text-[11px] text-amber-900">
+        <div className="font-bold mb-1">Debug · Anatomy-State</div>
+        <div>Noch keine relevanten Felder gefüllt. Sage etwas wie:</div>
+        <div className="font-mono mt-1 italic">"Schläfen links Stärke 7"</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-emerald-50 border border-emerald-300 rounded-md p-2 text-[11px] text-emerald-900">
+      <div className="font-bold mb-1">Debug · {filledFields.length} Feld(er) gefüllt:</div>
+      <div className="space-y-0.5 font-mono max-h-32 overflow-y-auto">
+        {filledFields.map(f => (
+          <div key={f} className="flex justify-between gap-2">
+            <span className="truncate">{f}</span>
+            <span className="font-bold">{JSON.stringify(state[f])}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // HEAD GRAFIK MIT OVERLAYS
 // ═══════════════════════════════════════════════════════════════════
 function AnatomyHeads({ state, recentField }) {
@@ -347,8 +382,9 @@ export function AnatomyView({ state, recentField }) {
         <div className="p-2">
           <AnatomyHeads state={state} recentField={recentField} />
         </div>
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3 space-y-2">
           <VASLegend />
+          <DebugPanel state={state} />
         </div>
       </div>
 
