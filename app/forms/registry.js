@@ -55,7 +55,7 @@ export const FORMS = {
     getInitial: zahnverschleissStatus.getInitial,
     getPrompt: zahnverschleissStatus.getPrompt,
     View: zahnverschleissStatus.View,
-    DEMO_UTTERANCES: [],
+    DEMO_UTTERANCES: zahnverschleissStatus.DEMO_UTTERANCES || [],
   },
   'manuelle-strukturanalyse': {
     id: 'manuelle-strukturanalyse',
@@ -63,7 +63,7 @@ export const FORMS = {
     getInitial: manuelleStrukturanalyse.getInitial,
     getPrompt: manuelleStrukturanalyse.getPrompt,
     View: manuelleStrukturanalyse.View,
-    DEMO_UTTERANCES: [],
+    DEMO_UTTERANCES: manuelleStrukturanalyse.DEMO_UTTERANCES || [],
   },
 };
 
