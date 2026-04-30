@@ -216,6 +216,34 @@ export default function App() {
     beep(440, 0.1);
   };
 
+  // Manueller Field-Update (von Editor-Komponenten gerufen)
+  // Wendet dieselbe Auto-Sync-Logik an wie der Sprach-Parser
+  const updateField = (field, value) => {
+    setFormStates(s => {
+      const next = { ...s };
+      const formCopy = { ...next[activeFormId] };
+      formCopy[field] = value;
+
+      // Auto-Sync VAS ↔ Boolean (gleiche Logik wie im Sprach-Handler)
+      const vasMatch = field.match(/^(pain_\w+)_vas_(left|right)$/);
+      if (vasMatch && typeof value === 'number' && value > 0) {
+        const boolField = `${vasMatch[1]}_${vasMatch[2]}`;
+        if (formCopy[boolField] !== true) formCopy[boolField] = true;
+      }
+      const boolMatch = field.match(/^(pain_(?:head|temples|ear_jaw|neck|shoulder))_(left|right)$/);
+      if (boolMatch && value === false) {
+        const vasField = `${boolMatch[1]}_vas_${boolMatch[2]}`;
+        formCopy[vasField] = null;
+      }
+
+      next[activeFormId] = formCopy;
+      return next;
+    });
+    setRecentField(field);
+    setTimeout(() => setRecentField(null), 1500);
+    beep(660, 0.04, 0.02);  // dezenterer Beep für manuelle Edits
+  };
+
   const submitDemo = () => {
     if (!demoText.trim()) return;
     handleUtterance(demoText.trim());
@@ -315,7 +343,7 @@ export default function App() {
               : "px-6 py-6 max-w-[1200px] mx-auto"
             }>
               <div className="min-w-0">
-                <ActiveView state={currentState} recentField={recentField} />
+                <ActiveView state={currentState} recentField={recentField} updateField={updateField} />
               </div>
               {HasAnatomy && (
                 <aside className="hidden xl:block">

@@ -1,15 +1,27 @@
 'use client';
 // ═══════════════════════════════════════════════════════════════════
 // Funktionsstatus — UI Component
-// Migration aus monolithischer page.js, fachlich identisch.
+// Alle Felder sind klickbar → Editor öffnet sich passend zum Feldtyp
 // ═══════════════════════════════════════════════════════════════════
 
 import React from 'react';
 import { Check } from 'lucide-react';
 import { TEETH_UPPER, TEETH_LOWER, MUSCLES, PAIN_REGIONS } from './form';
+import {
+  EditablePalpation, EditableNumber, EditableBoolean,
+  EditableEnum, EditableText, EditableCheckbox,
+} from '../../components/editable-fields';
 
-// ─── UI HELPERS ───────────────────────────────────────────────
-function Pill({ value, mini = false }) {
+// Globaler Update-Handler — wird via Context bereitgestellt
+const UpdateContext = React.createContext(() => {});
+
+// ─── UI HELPERS — alle editierbar wenn field gegeben ──────────
+function Pill({ value, mini = false, field, hot }) {
+  const update = React.useContext(UpdateContext);
+  if (field) {
+    return <EditablePalpation value={value} onChange={(v) => update(field, v)} hot={hot} mini={mini} />;
+  }
+  // Fallback: reine Anzeige (für Stellen wo kein Edit nötig)
   const colors = {
     0: 'bg-emerald-100 text-emerald-800 border-emerald-400',
     1: 'bg-amber-100 text-amber-900 border-amber-400',
@@ -18,13 +30,17 @@ function Pill({ value, mini = false }) {
   const empty = 'bg-slate-50 text-slate-400 border-slate-300 border-dashed';
   const cls = value === null || value === undefined ? empty : colors[value];
   return (
-    <div className={`${mini ? 'h-7 px-2 text-xs' : 'h-9 px-3 text-sm'} flex items-center justify-center rounded-md border-2 font-mono font-bold ${cls} transition-all duration-300`}>
+    <div className={`${mini ? 'h-7 px-2 text-xs' : 'h-9 px-3 text-sm'} flex items-center justify-center rounded-md border-2 font-mono font-bold ${cls}`}>
       {value === null || value === undefined ? '–' : value}
     </div>
   );
 }
 
-function ValuePill({ value, unit, big = false }) {
+function ValuePill({ value, unit, big = false, field, min = 0, max = 100, step = 1, hot, label }) {
+  const update = React.useContext(UpdateContext);
+  if (field) {
+    return <EditableNumber value={value} onChange={(v) => update(field, v)} unit={unit} big={big} min={min} max={max} step={step} hot={hot} label={label} />;
+  }
   const empty = value === null || value === undefined;
   return (
     <div className={`flex items-baseline gap-1 font-mono font-bold ${big ? 'text-2xl' : 'text-base'} ${empty ? 'text-slate-300' : 'text-slate-900'}`}>
@@ -34,7 +50,11 @@ function ValuePill({ value, unit, big = false }) {
   );
 }
 
-function YesNoIndicator({ value }) {
+function YesNoIndicator({ value, field, hot, label }) {
+  const update = React.useContext(UpdateContext);
+  if (field) {
+    return <EditableBoolean value={value} onChange={(v) => update(field, v)} hot={hot} label={label} />;
+  }
   if (value === null || value === undefined) return <span className="text-slate-400 font-mono text-sm">–</span>;
   return (
     <span className={`font-mono text-sm font-bold px-2 py-0.5 rounded ${value ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
@@ -43,7 +63,11 @@ function YesNoIndicator({ value }) {
   );
 }
 
-function Checkbox({ value, label, hot }) {
+function Checkbox({ value, label, hot, field }) {
+  const update = React.useContext(UpdateContext);
+  if (field) {
+    return <EditableCheckbox value={value} onChange={(v) => update(field, v)} hot={hot} label={label} />;
+  }
   const checked = value === true;
   return (
     <div className={`flex items-center gap-2 py-1 px-1.5 rounded ${hot ? 'animate-flash' : ''}`}>
@@ -57,16 +81,40 @@ function Checkbox({ value, label, hot }) {
   );
 }
 
-function FreitextField({ value, label, hot, lines = 2 }) {
+function FreitextField({ value, label, hot, lines = 2, field, placeholder }) {
+  const update = React.useContext(UpdateContext);
   return (
     <div className={`${hot ? 'animate-flash' : ''} rounded-md`}>
       <div className="text-[10px] tracking-widest text-slate-700 font-mono font-bold mb-1">{label}</div>
-      <div className={`px-3 py-2 rounded-md border-2 text-sm min-h-[${lines * 1.4}rem] ${
+      <div className={`px-3 py-2 rounded-md border-2 text-sm ${
         value ? 'bg-cyan-50 border-cyan-300 text-slate-900' : 'bg-slate-50 border-slate-300 border-dashed text-slate-400 italic'
       }`} style={{ minHeight: `${lines * 1.6}rem` }}>
-        {value || '— noch nicht erfasst —'}
+        {field ? (
+          <EditableText
+            value={value}
+            onChange={(v) => update(field, v)}
+            label={label}
+            placeholder={placeholder || '— klicken zum Eintragen —'}
+            lines={lines}
+            hot={hot}
+          />
+        ) : (
+          value || '— noch nicht erfasst —'
+        )}
       </div>
     </div>
+  );
+}
+
+function EnumField({ value, options, displayLabels, field, hot, label }) {
+  const update = React.useContext(UpdateContext);
+  if (field) {
+    return <EditableEnum value={value} onChange={(v) => update(field, v)} options={options} displayLabels={displayLabels} hot={hot} label={label} />;
+  }
+  return (
+    <span className="font-mono text-sm font-bold text-slate-900">
+      {value ? (displayLabels?.[value] || value) : <span className="text-slate-400">–</span>}
+    </span>
   );
 }
 
@@ -140,33 +188,35 @@ function SubLabel({ children }) {
 }
 
 // ─── MAIN VIEW ────────────────────────────────────────────────
-export function View({ state: form, recentField }) {
+export function View({ state: form, recentField, updateField }) {
   const isHot = (field) => recentField === field;
+  const update = updateField || (() => {});
 
   return (
+    <UpdateContext.Provider value={update}>
     <div className="max-w-[1400px] mx-auto p-6">
       <div className="space-y-4">
 
           {/* ═══════════ 01 ANAMNESE ═══════════ */}
           <SectionCard num="01" title="Anamnese · Vorgeschichte" recentField={recentField}
             fields={['visit_reason','recent_treatment','previous_function_therapy','head_neck_trauma']}>
-            <FreitextField value={form.visit_reason} label="GRUND DES BESUCHES" hot={isHot('visit_reason')} />
+            <FreitextField value={form.visit_reason} label="GRUND DES BESUCHES" hot={isHot('visit_reason')} field="visit_reason" />
             <div className="grid grid-cols-2 gap-x-6 mt-4">
               <div>
                 <SubLabel>VORBEHANDLUNG BEI</SubLabel>
-                <Checkbox value={form.recent_treatment_dentist} label="Zahnarzt" hot={isHot('recent_treatment_dentist')} />
-                <Checkbox value={form.recent_treatment_orthodontist} label="Kieferorthopäde" hot={isHot('recent_treatment_orthodontist')} />
-                <Checkbox value={form.recent_treatment_doctor} label="Arzt (allgemein)" hot={isHot('recent_treatment_doctor')} />
+                <Checkbox value={form.recent_treatment_dentist} label="Zahnarzt" hot={isHot('recent_treatment_dentist')} field="recent_treatment_dentist" />
+                <Checkbox value={form.recent_treatment_orthodontist} label="Kieferorthopäde" hot={isHot('recent_treatment_orthodontist')} field="recent_treatment_orthodontist" />
+                <Checkbox value={form.recent_treatment_doctor} label="Arzt (allgemein)" hot={isHot('recent_treatment_doctor')} field="recent_treatment_doctor" />
               </div>
               <div>
                 <SubLabel>ANAMNESE</SubLabel>
-                <Checkbox value={form.previous_function_therapy} label="Funktionstherapie bereits durchgeführt" hot={isHot('previous_function_therapy')} />
-                <Checkbox value={form.head_neck_trauma} label="Unfall/Schlag im Kopf-/Halsbereich" hot={isHot('head_neck_trauma')} />
+                <Checkbox value={form.previous_function_therapy} label="Funktionstherapie bereits durchgeführt" hot={isHot('previous_function_therapy')} field="previous_function_therapy" />
+                <Checkbox value={form.head_neck_trauma} label="Unfall/Schlag im Kopf-/Halsbereich" hot={isHot('head_neck_trauma')} field="head_neck_trauma" />
               </div>
             </div>
             {form.previous_function_therapy_type && (
               <div className="mt-3">
-                <FreitextField value={form.previous_function_therapy_type} label="ART DER FUNKTIONSTHERAPIE" hot={isHot('previous_function_therapy_type')} lines={1} />
+                <FreitextField value={form.previous_function_therapy_type} label="ART DER FUNKTIONSTHERAPIE" hot={isHot('previous_function_therapy_type')} lines={1} field="previous_function_therapy_type" />
               </div>
             )}
           </SectionCard>
@@ -176,10 +226,10 @@ export function View({ state: form, recentField }) {
             fields={['pain_vas','pain_impact','pain_head','pain_temples','pain_ear_jaw','pain_neck','pain_shoulder','pain_quality','pain_time','pain_frequency','pain_duration','pain_radiating']}>
             <div className="grid grid-cols-2 gap-x-8 gap-y-1 mb-4">
               <FieldRow label="Schmerz (VAS)" hot={isHot('pain_vas')}>
-                <ValuePill value={form.pain_vas} unit="/10" big />
+                <ValuePill value={form.pain_vas} unit="/10" big field="pain_vas" hot={isHot('pain_vas')} max={10} />
               </FieldRow>
               <FieldRow label="Beeinträchtigung (VAS)" hot={isHot('pain_impact_vas')}>
-                <ValuePill value={form.pain_impact_vas} unit="/10" big />
+                <ValuePill value={form.pain_impact_vas} unit="/10" big field="pain_impact_vas" hot={isHot('pain_impact_vas')} max={10} />
               </FieldRow>
             </div>
 
@@ -192,8 +242,8 @@ export function View({ state: form, recentField }) {
                 {PAIN_REGIONS.map(([key, label]) => (
                   <React.Fragment key={key}>
                     <div className={`text-sm text-slate-800 font-medium ${(isHot(`${key}_left`) || isHot(`${key}_right`)) ? 'animate-flash' : ''}`}>{label}</div>
-                    <div className="flex justify-center"><YesNoIndicator value={form[`${key}_left`]} /></div>
-                    <div className="flex justify-center"><YesNoIndicator value={form[`${key}_right`]} /></div>
+                    <div className="flex justify-center"><YesNoIndicator value={form[`${key}_left`]} field={`${key}_left`} hot={isHot(`${key}_left`)} /></div>
+                    <div className="flex justify-center"><YesNoIndicator value={form[`${key}_right`]} field={`${key}_right`} hot={isHot(`${key}_right`)} /></div>
                   </React.Fragment>
                 ))}
               </div>
@@ -205,20 +255,20 @@ export function View({ state: form, recentField }) {
             </div>
 
             <div className="border-t border-slate-200 pt-4 mt-4 grid grid-cols-2 gap-x-6 gap-y-2">
-              <FreitextField value={form.pain_quality} label="QUALITÄT" hot={isHot('pain_quality')} lines={1} />
+              <FreitextField value={form.pain_quality} label="QUALITÄT" hot={isHot('pain_quality')} lines={1} field="pain_quality" />
               <div>
                 <SubLabel>ZEITPUNKT</SubLabel>
                 <div className="flex flex-wrap gap-x-3">
-                  <Checkbox value={form.pain_time_morning} label="morgens" hot={isHot('pain_time_morning')} />
-                  <Checkbox value={form.pain_time_during_day} label="tagsüber" hot={isHot('pain_time_during_day')} />
-                  <Checkbox value={form.pain_time_evening} label="abends" hot={isHot('pain_time_evening')} />
-                  <Checkbox value={form.pain_time_specific_occasion} label="best. Anlass" hot={isHot('pain_time_specific_occasion')} />
+                  <Checkbox value={form.pain_time_morning} label="morgens" hot={isHot('pain_time_morning')} field="pain_time_morning" />
+                  <Checkbox value={form.pain_time_during_day} label="tagsüber" hot={isHot('pain_time_during_day')} field="pain_time_during_day" />
+                  <Checkbox value={form.pain_time_evening} label="abends" hot={isHot('pain_time_evening')} field="pain_time_evening" />
+                  <Checkbox value={form.pain_time_specific_occasion} label="best. Anlass" hot={isHot('pain_time_specific_occasion')} field="pain_time_specific_occasion" />
                 </div>
               </div>
               <FieldRow label="Dauer (Min/Std)" hot={isHot('pain_duration_minutes') || isHot('pain_duration_hours')}>
-                <ValuePill value={form.pain_duration_minutes} unit="min" />
+                <ValuePill value={form.pain_duration_minutes} unit="min" field="pain_duration_minutes" hot={isHot('pain_duration_minutes')} />
                 <span className="text-slate-400">·</span>
-                <ValuePill value={form.pain_duration_hours} unit="h" />
+                <ValuePill value={form.pain_duration_hours} unit="h" field="pain_duration_hours" hot={isHot('pain_duration_hours')} />
               </FieldRow>
               <FieldRow label="Häufigkeit" hot={isHot('pain_frequency')}>
                 <span className="font-mono text-sm font-bold text-slate-900">
@@ -229,7 +279,7 @@ export function View({ state: form, recentField }) {
                 </span>
               </FieldRow>
               <FieldRow label="Ausstrahlend" hot={isHot('pain_radiating')}>
-                <YesNoIndicator value={form.pain_radiating} />
+                <YesNoIndicator value={form.pain_radiating} field="pain_radiating" hot={isHot('pain_radiating')} />
               </FieldRow>
               <FieldRow label="Erstmals" hot={isHot('complaints_first_appeared')}>
                 <span className="font-mono text-xs text-slate-900 font-semibold">{form.complaints_first_appeared || <span className="text-slate-400">–</span>}</span>
@@ -237,7 +287,7 @@ export function View({ state: form, recentField }) {
             </div>
 
             {(form.pain_radiating_location) && (
-              <div className="mt-2"><FreitextField value={form.pain_radiating_location} label="AUSSTRAHLUNG" hot={isHot('pain_radiating_location')} lines={1} /></div>
+              <div className="mt-2"><FreitextField value={form.pain_radiating_location} label="AUSSTRAHLUNG" hot={isHot('pain_radiating_location')} lines={1} field="pain_radiating_location" /></div>
             )}
           </SectionCard>
 
@@ -257,8 +307,8 @@ export function View({ state: form, recentField }) {
               ].map(([key, label]) => (
                 <React.Fragment key={key}>
                   <div className="text-sm text-slate-800 font-medium">{label}</div>
-                  <div className="flex justify-center"><YesNoIndicator value={form[`${key}_impaired`]} /></div>
-                  <div className="flex justify-center"><YesNoIndicator value={form[`${key}_painful`]} /></div>
+                  <div className="flex justify-center"><YesNoIndicator value={form[`${key}_impaired`]} field={`${key}_impaired`} hot={isHot(`${key}_impaired`)} /></div>
+                  <div className="flex justify-center"><YesNoIndicator value={form[`${key}_painful`]} field={`${key}_painful`} hot={isHot(`${key}_painful`)} /></div>
                 </React.Fragment>
               ))}
             </div>
@@ -270,25 +320,25 @@ export function View({ state: form, recentField }) {
                 </span>
               </FieldRow>
               <FieldRow label="Gelenkger. L · R" hot={isHot('joint_sounds_left') || isHot('joint_sounds_right')}>
-                <YesNoIndicator value={form.joint_sounds_left} />
+                <YesNoIndicator value={form.joint_sounds_left} field="joint_sounds_left" hot={isHot('joint_sounds_left')} />
                 <span className="text-slate-400">·</span>
-                <YesNoIndicator value={form.joint_sounds_right} />
+                <YesNoIndicator value={form.joint_sounds_right} field="joint_sounds_right" hot={isHot('joint_sounds_right')} />
               </FieldRow>
               <FieldRow label="Geräusche seit" hot={isHot('joint_sounds_since')}>
                 <span className="font-mono text-xs text-slate-900 font-semibold">{form.joint_sounds_since || <span className="text-slate-400">–</span>}</span>
               </FieldRow>
               <FieldRow label="Zähne empfindlich" hot={isHot('teeth_painful')}>
-                <YesNoIndicator value={form.teeth_painful} />
+                <YesNoIndicator value={form.teeth_painful} field="teeth_painful" hot={isHot('teeth_painful')} />
               </FieldRow>
               <FieldRow label="Zähne passen" hot={isHot('teeth_fit_correctly')}>
-                <YesNoIndicator value={form.teeth_fit_correctly} />
+                <YesNoIndicator value={form.teeth_fit_correctly} field="teeth_fit_correctly" hot={isHot('teeth_fit_correctly')} />
               </FieldRow>
               <FieldRow label="Taubheitsgefühl Kopf/Gesicht" hot={isHot('numbness_head_face')}>
-                <YesNoIndicator value={form.numbness_head_face} />
+                <YesNoIndicator value={form.numbness_head_face} field="numbness_head_face" hot={isHot('numbness_head_face')} />
               </FieldRow>
             </div>
             {form.additional_anamnesis && (
-              <div className="mt-3"><FreitextField value={form.additional_anamnesis} label="WEITERE ANGABEN" hot={isHot('additional_anamnesis')} /></div>
+              <div className="mt-3"><FreitextField value={form.additional_anamnesis} label="WEITERE ANGABEN" hot={isHot('additional_anamnesis')} field="additional_anamnesis" /></div>
             )}
           </SectionCard>
 
@@ -300,11 +350,11 @@ export function View({ state: form, recentField }) {
               <div className="text-[10px] tracking-widest text-slate-700 font-mono font-bold text-center">LI</div>
               <div className="text-[10px] tracking-widest text-slate-700 font-mono font-bold text-center">RE</div>
               <div className="text-sm text-slate-800 font-medium">Palpation lateral</div>
-              <Pill value={form.joint_palp_lateral_left} />
-              <Pill value={form.joint_palp_lateral_right} />
+              <Pill value={form.joint_palp_lateral_left} field="joint_palp_lateral_left" hot={isHot('joint_palp_lateral_left')} />
+              <Pill value={form.joint_palp_lateral_right} field="joint_palp_lateral_right" hot={isHot('joint_palp_lateral_right')} />
               <div className="text-sm text-slate-800 font-medium">Palpation dorsal</div>
-              <Pill value={form.joint_palp_dorsal_left} />
-              <Pill value={form.joint_palp_dorsal_right} />
+              <Pill value={form.joint_palp_dorsal_left} field="joint_palp_dorsal_left" hot={isHot('joint_palp_dorsal_left')} />
+              <Pill value={form.joint_palp_dorsal_right} field="joint_palp_dorsal_right" hot={isHot('joint_palp_dorsal_right')} />
             </div>
 
             <div className="mt-5 pt-4 border-t border-slate-200">
@@ -339,8 +389,8 @@ export function View({ state: form, recentField }) {
               {MUSCLES.map(([key, label]) => (
                 <React.Fragment key={key}>
                   <div className={`text-sm text-slate-800 font-medium ${(isHot(`${key}_left`) || isHot(`${key}_right`)) ? 'animate-flash' : ''}`}>{label}</div>
-                  <Pill value={form[`${key}_left`]} mini />
-                  <Pill value={form[`${key}_right`]} mini />
+                  <Pill value={form[`${key}_left`]} field={`${key}_left`} hot={isHot(`${key}_left`)} mini />
+                  <Pill value={form[`${key}_right`]} field={`${key}_right`} hot={isHot(`${key}_right`)} mini />
                 </React.Fragment>
               ))}
             </div>
@@ -363,11 +413,11 @@ export function View({ state: form, recentField }) {
                 <div className="space-y-1.5">
                   <div className={`flex justify-between items-baseline ${isHot('mouth_opening_active_mm') ? 'animate-flash' : ''}`}>
                     <span className="text-xs text-slate-700 font-medium">aktiv</span>
-                    <ValuePill value={form.mouth_opening_active_mm} unit="mm" big />
+                    <ValuePill value={form.mouth_opening_active_mm} unit="mm" big field="mouth_opening_active_mm" hot={isHot('mouth_opening_active_mm')} max={10} />
                   </div>
                   <div className={`flex justify-between items-baseline ${isHot('mouth_opening_passive_mm') ? 'animate-flash' : ''}`}>
                     <span className="text-xs text-slate-700 font-medium">passiv</span>
-                    <ValuePill value={form.mouth_opening_passive_mm} unit="mm" big />
+                    <ValuePill value={form.mouth_opening_passive_mm} unit="mm" big field="mouth_opening_passive_mm" hot={isHot('mouth_opening_passive_mm')} max={10} />
                   </div>
                 </div>
               </div>
@@ -376,11 +426,11 @@ export function View({ state: form, recentField }) {
                 <div className="space-y-1.5">
                   <div className={`flex justify-between items-baseline ${isHot('laterotrusion_left_mm') ? 'animate-flash' : ''}`}>
                     <span className="text-xs text-slate-700 font-medium">links</span>
-                    <ValuePill value={form.laterotrusion_left_mm} unit="mm" big />
+                    <ValuePill value={form.laterotrusion_left_mm} unit="mm" big field="laterotrusion_left_mm" hot={isHot('laterotrusion_left_mm')} max={10} />
                   </div>
                   <div className={`flex justify-between items-baseline ${isHot('laterotrusion_right_mm') ? 'animate-flash' : ''}`}>
                     <span className="text-xs text-slate-700 font-medium">rechts</span>
-                    <ValuePill value={form.laterotrusion_right_mm} unit="mm" big />
+                    <ValuePill value={form.laterotrusion_right_mm} unit="mm" big field="laterotrusion_right_mm" hot={isHot('laterotrusion_right_mm')} max={10} />
                   </div>
                 </div>
               </div>
@@ -389,11 +439,11 @@ export function View({ state: form, recentField }) {
                 <div className="space-y-1.5">
                   <div className={`flex justify-between items-baseline ${isHot('protrusion_mm') ? 'animate-flash' : ''}`}>
                     <span className="text-xs text-slate-700 font-medium">protr.</span>
-                    <ValuePill value={form.protrusion_mm} unit="mm" big />
+                    <ValuePill value={form.protrusion_mm} unit="mm" big field="protrusion_mm" hot={isHot('protrusion_mm')} max={10} />
                   </div>
                   <div className={`flex justify-between items-baseline ${isHot('retrusion_mm') ? 'animate-flash' : ''}`}>
                     <span className="text-xs text-slate-700 font-medium">retr.</span>
-                    <ValuePill value={form.retrusion_mm} unit="mm" big />
+                    <ValuePill value={form.retrusion_mm} unit="mm" big field="retrusion_mm" hot={isHot('retrusion_mm')} max={10} />
                   </div>
                 </div>
               </div>
@@ -405,7 +455,7 @@ export function View({ state: form, recentField }) {
             fields={['gliding','vertical_relation','static_occlusion']}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 mb-4">
               <FieldRow label="Gleiten ZO ↔ HO" hot={isHot('gliding_zo_ho')}>
-                <YesNoIndicator value={form.gliding_zo_ho} />
+                <YesNoIndicator value={form.gliding_zo_ho} field="gliding_zo_ho" hot={isHot('gliding_zo_ho')} />
               </FieldRow>
               <FieldRow label="Vertikale Relation" hot={isHot('vertical_relation')}>
                 <span className={`font-mono text-sm font-bold ${
@@ -497,13 +547,13 @@ export function View({ state: form, recentField }) {
           <SectionCard num="08" title="Weitere Befunde" recentField={recentField}
             fields={['abrasions_attrition','wedge_defects','tongue_impressions','cheek_impressions','other_findings']}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-              <Checkbox value={form.abrasions_attrition} label="Abrasionen / Attrition" hot={isHot('abrasions_attrition')} />
-              <Checkbox value={form.wedge_defects} label="Keilförmige Defekte" hot={isHot('wedge_defects')} />
-              <Checkbox value={form.tongue_impressions} label="Zungenimpressionen" hot={isHot('tongue_impressions')} />
-              <Checkbox value={form.cheek_impressions} label="Wangenimpressionen" hot={isHot('cheek_impressions')} />
+              <Checkbox value={form.abrasions_attrition} label="Abrasionen / Attrition" hot={isHot('abrasions_attrition')} field="abrasions_attrition" />
+              <Checkbox value={form.wedge_defects} label="Keilförmige Defekte" hot={isHot('wedge_defects')} field="wedge_defects" />
+              <Checkbox value={form.tongue_impressions} label="Zungenimpressionen" hot={isHot('tongue_impressions')} field="tongue_impressions" />
+              <Checkbox value={form.cheek_impressions} label="Wangenimpressionen" hot={isHot('cheek_impressions')} field="cheek_impressions" />
             </div>
             {form.other_findings && (
-              <div className="mt-3"><FreitextField value={form.other_findings} label="ANDERE BEFUNDE" hot={isHot('other_findings')} lines={1} /></div>
+              <div className="mt-3"><FreitextField value={form.other_findings} label="ANDERE BEFUNDE" hot={isHot('other_findings')} lines={1} field="other_findings" /></div>
             )}
           </SectionCard>
 
@@ -511,38 +561,38 @@ export function View({ state: form, recentField }) {
           <SectionCard num="09" title="Weitere Diagnostische Maßnahmen" recentField={recentField}
             fields={['manual_structure','orthopedic','psychosocial','instrumental','consultation','consult_']}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-              <Checkbox value={form.manual_structure_analysis} label="Manuelle Strukturanalyse" hot={isHot('manual_structure_analysis')} />
-              <Checkbox value={form.orthopedic_screening} label="Orthopädisches Screening" hot={isHot('orthopedic_screening')} />
-              <Checkbox value={form.psychosocial_screening} label="Psychosoziales Screening" hot={isHot('psychosocial_screening')} />
-              <Checkbox value={form.instrumental_function_analysis} label="Instr. Funktionsanalyse" hot={isHot('instrumental_function_analysis')} />
-              <Checkbox value={form.instrumental_occlusion_analysis} label="Instr. Okklusionsanalyse" hot={isHot('instrumental_occlusion_analysis')} />
-              <Checkbox value={form.consultation} label="Konsiliarische Untersuchung" hot={isHot('consultation')} />
+              <Checkbox value={form.manual_structure_analysis} label="Manuelle Strukturanalyse" hot={isHot('manual_structure_analysis')} field="manual_structure_analysis" />
+              <Checkbox value={form.orthopedic_screening} label="Orthopädisches Screening" hot={isHot('orthopedic_screening')} field="orthopedic_screening" />
+              <Checkbox value={form.psychosocial_screening} label="Psychosoziales Screening" hot={isHot('psychosocial_screening')} field="psychosocial_screening" />
+              <Checkbox value={form.instrumental_function_analysis} label="Instr. Funktionsanalyse" hot={isHot('instrumental_function_analysis')} field="instrumental_function_analysis" />
+              <Checkbox value={form.instrumental_occlusion_analysis} label="Instr. Okklusionsanalyse" hot={isHot('instrumental_occlusion_analysis')} field="instrumental_occlusion_analysis" />
+              <Checkbox value={form.consultation} label="Konsiliarische Untersuchung" hot={isHot('consultation')} field="consultation" />
             </div>
             <div className="mt-4 pt-3 border-t border-slate-200">
               <SubLabel>KONSILE</SubLabel>
               <div className="grid grid-cols-3 gap-x-4 gap-y-0.5">
-                <Checkbox value={form.consult_mri} label="MRT" hot={isHot('consult_mri')} />
-                <Checkbox value={form.consult_ct} label="CT" hot={isHot('consult_ct')} />
-                <Checkbox value={form.consult_arthroscopy} label="Arthroskopie" hot={isHot('consult_arthroscopy')} />
-                <Checkbox value={form.consult_orthodontics} label="Kieferorthopädie" hot={isHot('consult_orthodontics')} />
-                <Checkbox value={form.consult_mkg} label="MKG-Chirurgie" hot={isHot('consult_mkg')} />
-                <Checkbox value={form.consult_ent} label="HNO" hot={isHot('consult_ent')} />
-                <Checkbox value={form.consult_orthopedics} label="Orthopädie" hot={isHot('consult_orthopedics')} />
-                <Checkbox value={form.consult_rheumatology} label="Rheumatologie" hot={isHot('consult_rheumatology')} />
-                <Checkbox value={form.consult_internal} label="Innere Medizin" hot={isHot('consult_internal')} />
-                <Checkbox value={form.consult_neurology} label="Neurologie" hot={isHot('consult_neurology')} />
-                <Checkbox value={form.consult_psychosomatic} label="Psychosomatik" hot={isHot('consult_psychosomatic')} />
-                <Checkbox value={form.consult_other} label="andere" hot={isHot('consult_other')} />
+                <Checkbox value={form.consult_mri} label="MRT" hot={isHot('consult_mri')} field="consult_mri" />
+                <Checkbox value={form.consult_ct} label="CT" hot={isHot('consult_ct')} field="consult_ct" />
+                <Checkbox value={form.consult_arthroscopy} label="Arthroskopie" hot={isHot('consult_arthroscopy')} field="consult_arthroscopy" />
+                <Checkbox value={form.consult_orthodontics} label="Kieferorthopädie" hot={isHot('consult_orthodontics')} field="consult_orthodontics" />
+                <Checkbox value={form.consult_mkg} label="MKG-Chirurgie" hot={isHot('consult_mkg')} field="consult_mkg" />
+                <Checkbox value={form.consult_ent} label="HNO" hot={isHot('consult_ent')} field="consult_ent" />
+                <Checkbox value={form.consult_orthopedics} label="Orthopädie" hot={isHot('consult_orthopedics')} field="consult_orthopedics" />
+                <Checkbox value={form.consult_rheumatology} label="Rheumatologie" hot={isHot('consult_rheumatology')} field="consult_rheumatology" />
+                <Checkbox value={form.consult_internal} label="Innere Medizin" hot={isHot('consult_internal')} field="consult_internal" />
+                <Checkbox value={form.consult_neurology} label="Neurologie" hot={isHot('consult_neurology')} field="consult_neurology" />
+                <Checkbox value={form.consult_psychosomatic} label="Psychosomatik" hot={isHot('consult_psychosomatic')} field="consult_psychosomatic" />
+                <Checkbox value={form.consult_other} label="andere" hot={isHot('consult_other')} field="consult_other" />
               </div>
               {form.consult_other_text && (
-                <div className="mt-2"><FreitextField value={form.consult_other_text} label="ANDERE KONSILE" hot={isHot('consult_other_text')} lines={1} /></div>
+                <div className="mt-2"><FreitextField value={form.consult_other_text} label="ANDERE KONSILE" hot={isHot('consult_other_text')} lines={1} field="consult_other_text" /></div>
               )}
             </div>
           </SectionCard>
 
           {/* ═══════════ 10 INITIALDIAGNOSE ═══════════ */}
           <SectionCard num="10" title="Initialdiagnose" recentField={recentField} fields={['initial_diagnosis']}>
-            <FreitextField value={form.initial_diagnosis} label="DIAGNOSE" hot={isHot('initial_diagnosis')} lines={3} />
+            <FreitextField value={form.initial_diagnosis} label="DIAGNOSE" hot={isHot('initial_diagnosis')} lines={3} field="initial_diagnosis" />
           </SectionCard>
 
           {/* ═══════════ 11 THERAPIE ═══════════ */}
@@ -551,33 +601,33 @@ export function View({ state: form, recentField }) {
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <SubLabel>INITIALTHERAPIE</SubLabel>
-                <Checkbox value={form.splint} label="Okklusionsschiene" hot={isHot('splint')} />
+                <Checkbox value={form.splint} label="Okklusionsschiene" hot={isHot('splint')} field="splint" />
                 {form.splint_type && (
                   <div className="ml-6 -mt-1 mb-1 text-xs text-slate-700 italic">→ {form.splint_type}</div>
                 )}
-                <Checkbox value={form.physical_therapy} label="Physikalische Therapie" hot={isHot('physical_therapy')} />
+                <Checkbox value={form.physical_therapy} label="Physikalische Therapie" hot={isHot('physical_therapy')} field="physical_therapy" />
                 <div className="ml-5 grid grid-cols-2 gap-x-3 mb-1">
-                  <Checkbox value={form.pt_massage} label="Massage" hot={isHot('pt_massage')} />
-                  <Checkbox value={form.pt_heat} label="Wärme" hot={isHot('pt_heat')} />
-                  <Checkbox value={form.pt_cold} label="Kälte" hot={isHot('pt_cold')} />
-                  <Checkbox value={form.pt_electro} label="Elektrotherapie" hot={isHot('pt_electro')} />
+                  <Checkbox value={form.pt_massage} label="Massage" hot={isHot('pt_massage')} field="pt_massage" />
+                  <Checkbox value={form.pt_heat} label="Wärme" hot={isHot('pt_heat')} field="pt_heat" />
+                  <Checkbox value={form.pt_cold} label="Kälte" hot={isHot('pt_cold')} field="pt_cold" />
+                  <Checkbox value={form.pt_electro} label="Elektrotherapie" hot={isHot('pt_electro')} field="pt_electro" />
                 </div>
-                <Checkbox value={form.manual_therapy} label="Manuelle Therapie" hot={isHot('manual_therapy')} />
-                <Checkbox value={form.exercises} label="Bewegungsübungen" hot={isHot('exercises')} />
-                <Checkbox value={form.medication} label="Medikamentöse Therapie" hot={isHot('medication')} />
-                <Checkbox value={form.relaxation} label="Entspannungsübungen" hot={isHot('relaxation')} />
-                <Checkbox value={form.therapy_other_initial} label="andere" hot={isHot('therapy_other_initial')} />
+                <Checkbox value={form.manual_therapy} label="Manuelle Therapie" hot={isHot('manual_therapy')} field="manual_therapy" />
+                <Checkbox value={form.exercises} label="Bewegungsübungen" hot={isHot('exercises')} field="exercises" />
+                <Checkbox value={form.medication} label="Medikamentöse Therapie" hot={isHot('medication')} field="medication" />
+                <Checkbox value={form.relaxation} label="Entspannungsübungen" hot={isHot('relaxation')} field="relaxation" />
+                <Checkbox value={form.therapy_other_initial} label="andere" hot={isHot('therapy_other_initial')} field="therapy_other_initial" />
               </div>
               <div>
                 <SubLabel>WEITERE THERAPIE</SubLabel>
-                <Checkbox value={form.selective_grinding} label="Einschleifmaßnahmen" hot={isHot('selective_grinding')} />
-                <Checkbox value={form.restorative_prosthetic} label="Restaurativ / Prothetisch" hot={isHot('restorative_prosthetic')} />
-                <Checkbox value={form.permanent_splint} label="Dauerschiene" hot={isHot('permanent_splint')} />
-                <Checkbox value={form.psychosomatic_therapy} label="Psychosomatische Therapie" hot={isHot('psychosomatic_therapy')} />
-                <Checkbox value={form.orthodontics_therapy} label="Kieferorthopädie" hot={isHot('orthodontics_therapy')} />
-                <Checkbox value={form.orthodontic_surgery} label="KFO-Chirurgie" hot={isHot('orthodontic_surgery')} />
-                <Checkbox value={form.joint_surgery} label="Kiefergelenkchirurgie" hot={isHot('joint_surgery')} />
-                <Checkbox value={form.therapy_other_further} label="andere" hot={isHot('therapy_other_further')} />
+                <Checkbox value={form.selective_grinding} label="Einschleifmaßnahmen" hot={isHot('selective_grinding')} field="selective_grinding" />
+                <Checkbox value={form.restorative_prosthetic} label="Restaurativ / Prothetisch" hot={isHot('restorative_prosthetic')} field="restorative_prosthetic" />
+                <Checkbox value={form.permanent_splint} label="Dauerschiene" hot={isHot('permanent_splint')} field="permanent_splint" />
+                <Checkbox value={form.psychosomatic_therapy} label="Psychosomatische Therapie" hot={isHot('psychosomatic_therapy')} field="psychosomatic_therapy" />
+                <Checkbox value={form.orthodontics_therapy} label="Kieferorthopädie" hot={isHot('orthodontics_therapy')} field="orthodontics_therapy" />
+                <Checkbox value={form.orthodontic_surgery} label="KFO-Chirurgie" hot={isHot('orthodontic_surgery')} field="orthodontic_surgery" />
+                <Checkbox value={form.joint_surgery} label="Kiefergelenkchirurgie" hot={isHot('joint_surgery')} field="joint_surgery" />
+                <Checkbox value={form.therapy_other_further} label="andere" hot={isHot('therapy_other_further')} field="therapy_other_further" />
               </div>
             </div>
           </SectionCard>
@@ -595,18 +645,18 @@ export function View({ state: form, recentField }) {
             <div className="border-t border-slate-200 pt-4">
               <SubLabel>INDIKATIONEN</SubLabel>
               <div className="space-y-0.5">
-                <Checkbox value={form.indication_function_pretreatment} label="Funktionelle Vorbehandlung" hot={isHot('indication_function_pretreatment')} />
-                <Checkbox value={form.indication_jaw_muscle} label="Kiefergelenk-/Muskelerkrankungen" hot={isHot('indication_jaw_muscle')} />
-                <Checkbox value={form.indication_dysgnathy} label="Mit Dysgnathien verbundene Erkrankungen" hot={isHot('indication_dysgnathy')} />
-                <Checkbox value={form.indication_periodontal} label="Parodontopathien (ungleichm. Belastung)" hot={isHot('indication_periodontal')} />
-                <Checkbox value={form.indication_dentition_reconstruction} label="Gebisssanierung mit verlorener ZO" hot={isHot('indication_dentition_reconstruction')} />
-                <Checkbox value={form.indication_kfo_planning} label="Operations-/KFO-Planung" hot={isHot('indication_kfo_planning')} />
-                <Checkbox value={form.indication_extensive_restoration} label="Umfangr. restaurative/prothet. Versorgung" hot={isHot('indication_extensive_restoration')} />
-                <Checkbox value={form.indication_chronic_pain} label="Adjuvant bei chronischem Schmerz" hot={isHot('indication_chronic_pain')} />
-                <Checkbox value={form.indication_other} label="Sonstige Indikation" hot={isHot('indication_other')} />
+                <Checkbox value={form.indication_function_pretreatment} label="Funktionelle Vorbehandlung" hot={isHot('indication_function_pretreatment')} field="indication_function_pretreatment" />
+                <Checkbox value={form.indication_jaw_muscle} label="Kiefergelenk-/Muskelerkrankungen" hot={isHot('indication_jaw_muscle')} field="indication_jaw_muscle" />
+                <Checkbox value={form.indication_dysgnathy} label="Mit Dysgnathien verbundene Erkrankungen" hot={isHot('indication_dysgnathy')} field="indication_dysgnathy" />
+                <Checkbox value={form.indication_periodontal} label="Parodontopathien (ungleichm. Belastung)" hot={isHot('indication_periodontal')} field="indication_periodontal" />
+                <Checkbox value={form.indication_dentition_reconstruction} label="Gebisssanierung mit verlorener ZO" hot={isHot('indication_dentition_reconstruction')} field="indication_dentition_reconstruction" />
+                <Checkbox value={form.indication_kfo_planning} label="Operations-/KFO-Planung" hot={isHot('indication_kfo_planning')} field="indication_kfo_planning" />
+                <Checkbox value={form.indication_extensive_restoration} label="Umfangr. restaurative/prothet. Versorgung" hot={isHot('indication_extensive_restoration')} field="indication_extensive_restoration" />
+                <Checkbox value={form.indication_chronic_pain} label="Adjuvant bei chronischem Schmerz" hot={isHot('indication_chronic_pain')} field="indication_chronic_pain" />
+                <Checkbox value={form.indication_other} label="Sonstige Indikation" hot={isHot('indication_other')} field="indication_other" />
               </div>
               {form.indication_other_text && (
-                <div className="mt-2"><FreitextField value={form.indication_other_text} label="BEGRÜNDUNG" hot={isHot('indication_other_text')} lines={1} /></div>
+                <div className="mt-2"><FreitextField value={form.indication_other_text} label="BEGRÜNDUNG" hot={isHot('indication_other_text')} lines={1} field="indication_other_text" /></div>
               )}
             </div>
 
@@ -643,7 +693,7 @@ export function View({ state: form, recentField }) {
             </div>
 
             {form.treatment_planning_notes && (
-              <div className="mt-4"><FreitextField value={form.treatment_planning_notes} label="PLANUNG / THERAPIE-NOTIZEN" hot={isHot('treatment_planning_notes')} lines={2} /></div>
+              <div className="mt-4"><FreitextField value={form.treatment_planning_notes} label="PLANUNG / THERAPIE-NOTIZEN" hot={isHot('treatment_planning_notes')} lines={2} field="treatment_planning_notes" /></div>
             )}
           </SectionCard>
 
@@ -682,8 +732,8 @@ export function View({ state: form, recentField }) {
             </div>
 
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-4">
-              <FreitextField value={form.splint_main_complaints} label="HAUPTBESCHWERDEN" hot={isHot('splint_main_complaints')} lines={3} />
-              <FreitextField value={form.splint_treatment_goals} label="BEHANDLUNGSZIELE" hot={isHot('splint_treatment_goals')} lines={3} />
+              <FreitextField value={form.splint_main_complaints} label="HAUPTBESCHWERDEN" hot={isHot('splint_main_complaints')} lines={3} field="splint_main_complaints" />
+              <FreitextField value={form.splint_treatment_goals} label="BEHANDLUNGSZIELE" hot={isHot('splint_treatment_goals')} lines={3} field="splint_treatment_goals" />
             </div>
 
             <div className="border-t border-slate-200 pt-4">
@@ -702,14 +752,14 @@ export function View({ state: form, recentField }) {
                 ].map(([key, label]) => (
                   <React.Fragment key={key}>
                     <div className={`text-sm text-slate-800 font-medium ${(isHot(`splint_${key}`) || isHot(`splint_${key}_intensity`)) ? 'animate-flash' : ''}`}>{label}</div>
-                    <div className="flex justify-center"><YesNoIndicator value={form[`splint_${key}`]} /></div>
+                    <div className="flex justify-center"><YesNoIndicator value={form[`splint_${key}`]} field={`splint_${key}`} hot={isHot(`splint_${key}`)} /></div>
                     <div className="flex justify-center"><ValuePill value={form[`splint_${key === 'ear_pain_tinnitus' ? 'ear_pain' : key === 'atypical_facial_pain' ? 'facial_pain' : key}_intensity`]} unit="/10" /></div>
                   </React.Fragment>
                 ))}
               </div>
               <div className={`mt-3 flex items-center justify-between ${isHot('splint_max_opening_mm') ? 'animate-flash' : ''}`}>
                 <span className="text-sm text-slate-700 font-medium">Max. Mundöffnung</span>
-                <ValuePill value={form.splint_max_opening_mm} unit="mm" big />
+                <ValuePill value={form.splint_max_opening_mm} unit="mm" big field="splint_max_opening_mm" hot={isHot('splint_max_opening_mm')} max={10} />
               </div>
             </div>
 
@@ -724,7 +774,7 @@ export function View({ state: form, recentField }) {
                   </span>
                 </FieldRow>
                 <FieldRow label="Lippenschluss" hot={isHot('splint_lip_closure')}>
-                  <YesNoIndicator value={form.splint_lip_closure} />
+                  <YesNoIndicator value={form.splint_lip_closure} field="splint_lip_closure" hot={isHot('splint_lip_closure')} />
                 </FieldRow>
                 <FieldRow label="Tonsillen (0–4)" hot={isHot('splint_tonsils_grade')}>
                   <ValuePill value={form.splint_tonsils_grade} />
@@ -732,17 +782,17 @@ export function View({ state: form, recentField }) {
               </div>
               <div>
                 <SubLabel>SCHLAF</SubLabel>
-                <Checkbox value={form.splint_snoring} label="Schnarchen" hot={isHot('splint_snoring')} />
-                <Checkbox value={form.splint_apnea} label="Apnoe" hot={isHot('splint_apnea')} />
-                <Checkbox value={form.splint_restless_sleep} label="Unruhig" hot={isHot('splint_restless_sleep')} />
-                <Checkbox value={form.splint_morning_fatigue} label="Morg. Müdigkeit" hot={isHot('splint_morning_fatigue')} />
-                <Checkbox value={form.splint_sleep_study_done} label="Schlafstudie erfolgt" hot={isHot('splint_sleep_study_done')} />
+                <Checkbox value={form.splint_snoring} label="Schnarchen" hot={isHot('splint_snoring')} field="splint_snoring" />
+                <Checkbox value={form.splint_apnea} label="Apnoe" hot={isHot('splint_apnea')} field="splint_apnea" />
+                <Checkbox value={form.splint_restless_sleep} label="Unruhig" hot={isHot('splint_restless_sleep')} field="splint_restless_sleep" />
+                <Checkbox value={form.splint_morning_fatigue} label="Morg. Müdigkeit" hot={isHot('splint_morning_fatigue')} field="splint_morning_fatigue" />
+                <Checkbox value={form.splint_sleep_study_done} label="Schlafstudie erfolgt" hot={isHot('splint_sleep_study_done')} field="splint_sleep_study_done" />
               </div>
               <div>
                 <SubLabel>HALTUNG</SubLabel>
-                <Checkbox value={form.splint_posture_head_forward} label="Kopf nach vorn" hot={isHot('splint_posture_head_forward')} />
-                <Checkbox value={form.splint_posture_pelvic_tilt} label="Beckenschiefstand" hot={isHot('splint_posture_pelvic_tilt')} />
-                <Checkbox value={form.splint_posture_shoulder_drop} label="Schultertiefstand" hot={isHot('splint_posture_shoulder_drop')} />
+                <Checkbox value={form.splint_posture_head_forward} label="Kopf nach vorn" hot={isHot('splint_posture_head_forward')} field="splint_posture_head_forward" />
+                <Checkbox value={form.splint_posture_pelvic_tilt} label="Beckenschiefstand" hot={isHot('splint_posture_pelvic_tilt')} field="splint_posture_pelvic_tilt" />
+                <Checkbox value={form.splint_posture_shoulder_drop} label="Schultertiefstand" hot={isHot('splint_posture_shoulder_drop')} field="splint_posture_shoulder_drop" />
               </div>
             </div>
 
@@ -758,7 +808,7 @@ export function View({ state: form, recentField }) {
                      <span className="text-slate-400">–</span>}
                   </span>
                 </FieldRow>
-                <Checkbox value={form.splint_tongue_correction_needed} label="Zungen-Korrekturbedarf" hot={isHot('splint_tongue_correction_needed')} />
+                <Checkbox value={form.splint_tongue_correction_needed} label="Zungen-Korrekturbedarf" hot={isHot('splint_tongue_correction_needed')} field="splint_tongue_correction_needed" />
                 <FieldRow label="Wangenmuskeln" hot={isHot('splint_cheek_muscles')}>
                   <span className="font-mono text-sm font-bold text-slate-900">
                     {form.splint_cheek_muscles === 'hypertonic' ? 'hyperton' :
@@ -767,14 +817,14 @@ export function View({ state: form, recentField }) {
                      <span className="text-slate-400">–</span>}
                   </span>
                 </FieldRow>
-                <Checkbox value={form.splint_cheek_exercises_needed} label="Wangen-Übungen empfohlen" hot={isHot('splint_cheek_exercises_needed')} />
+                <Checkbox value={form.splint_cheek_exercises_needed} label="Wangen-Übungen empfohlen" hot={isHot('splint_cheek_exercises_needed')} field="splint_cheek_exercises_needed" />
               </div>
               <div className="mt-2">
                 <SubLabel>SCHLUCKREFLEX</SubLabel>
                 <div className="flex flex-wrap gap-x-4">
-                  <Checkbox value={form.splint_swallow_tongue_thrust} label="Zungenstoß" hot={isHot('splint_swallow_tongue_thrust')} />
-                  <Checkbox value={form.splint_swallow_mentalis_activity} label="Mentalis-Aktivität" hot={isHot('splint_swallow_mentalis_activity')} />
-                  <Checkbox value={form.splint_swallow_myofunctional_therapy_needed} label="Myofunkt. Therapie empfohlen" hot={isHot('splint_swallow_myofunctional_therapy_needed')} />
+                  <Checkbox value={form.splint_swallow_tongue_thrust} label="Zungenstoß" hot={isHot('splint_swallow_tongue_thrust')} field="splint_swallow_tongue_thrust" />
+                  <Checkbox value={form.splint_swallow_mentalis_activity} label="Mentalis-Aktivität" hot={isHot('splint_swallow_mentalis_activity')} field="splint_swallow_mentalis_activity" />
+                  <Checkbox value={form.splint_swallow_myofunctional_therapy_needed} label="Myofunkt. Therapie empfohlen" hot={isHot('splint_swallow_myofunctional_therapy_needed')} field="splint_swallow_myofunctional_therapy_needed" />
                 </div>
               </div>
             </div>
@@ -790,7 +840,7 @@ export function View({ state: form, recentField }) {
                   </span>
                 </FieldRow>
                 <FieldRow label="Engstand" hot={isHot('splint_crowding')}>
-                  <YesNoIndicator value={form.splint_crowding} />
+                  <YesNoIndicator value={form.splint_crowding} field="splint_crowding" hot={isHot('splint_crowding')} />
                 </FieldRow>
                 <FieldRow label="Klasse" hot={isHot('splint_class')}>
                   <span className="font-mono text-sm font-bold text-slate-900">
@@ -810,8 +860,8 @@ export function View({ state: form, recentField }) {
             </div>
 
             <div className="border-t border-slate-200 pt-4 mt-4 space-y-3">
-              <FreitextField value={form.splint_recommended_appliance} label="EMPFOHLENE APPARATUR" hot={isHot('splint_recommended_appliance')} lines={1} />
-              <FreitextField value={form.splint_special_notes} label="BESONDERE ANMERKUNGEN" hot={isHot('splint_special_notes')} lines={2} />
+              <FreitextField value={form.splint_recommended_appliance} label="EMPFOHLENE APPARATUR" hot={isHot('splint_recommended_appliance')} lines={1} field="splint_recommended_appliance" />
+              <FreitextField value={form.splint_special_notes} label="BESONDERE ANMERKUNGEN" hot={isHot('splint_special_notes')} lines={2} field="splint_special_notes" />
             </div>
           </SectionCard>
       </div>
@@ -831,5 +881,6 @@ export function View({ state: form, recentField }) {
         </p>
       </div>
     </div>
+    </UpdateContext.Provider>
   );
 }
