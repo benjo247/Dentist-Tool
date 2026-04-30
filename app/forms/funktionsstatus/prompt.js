@@ -25,10 +25,40 @@ pain_shoulder_left, pain_shoulder_right (boolean): Schulter-Schmerzen ja/nein
 pain_shoulder_vas_left, pain_shoulder_vas_right (number 0-10): Intensität Schulter
 
 WICHTIG bei Schmerzangaben mit Intensität:
-- "Kopfschmerz links Stärke 7" → pain_head_left: true UND pain_head_vas_left: 7
-- "Schläfen rechts VAS 4" → pain_temples_right: true UND pain_temples_vas_right: 4
-- "Nacken beidseits stark, etwa 8" → alle 4 Felder: pain_neck_left/right: true, pain_neck_vas_left/right: 8
-- "kein Kopfschmerz" → pain_head_left/right: false (keine VAS-Werte)
+
+1. SEITEN-DEFAULTS:
+- Wenn KEINE Seite genannt → beide Seiten setzen (left UND right)
+- "Schläfen Schmerz" (ohne Seite) → pain_temples_left=true UND pain_temples_right=true
+- "Kopfschmerz Stärke 6" (ohne Seite) → pain_head_left=true, pain_head_right=true, beide VAS=6
+- "links" oder "rechts" oder "beidseits" → entsprechend nur die genannten Seiten
+
+2. ZAHL-WORTE als Zahlen:
+- "Eins"=1, "Zwei"=2, "Drei"=3, "Vier"=4, "Fünf"=5, "Sechs"=6, "Sieben"=7, "Acht"=8, "Neun"=9, "Zehn"=10
+- Auch wenn ausgeschrieben (Speech-to-Text macht das oft so)
+
+3. SYNONYME für VAS-Intensität:
+- "Stärke X", "VAS X", "Schmerzstärke X", "Intensität X", "X von 10", "X auf der Skala" → alle gleich
+- "Schmerz Stärke 7" = "VAS 7" = "Schmerzstärke 7" = "Stärke 7"
+
+4. INTERPRETATION von "Schmerzen" als Aussage:
+- "Schmerzen [Region]" oder "Schmerzen an der [Region]" → setzt Region auf true
+- "Schmerz [Region] Stärke X" → setzt Region auf true UND VAS auf X
+- "Schmerzen Stärke 7 Schläfe" / "Stärke 7 in der Schläfe" / "Schläfe Stärke 7" → alles äquivalent
+
+5. SYNONYME für Regionen:
+- "Schläfe", "Schläfen", "Temporalis-Region" → pain_temples
+- "Kopf", "Kopfweh", "Kopfschmerz" → pain_head
+- "Ohr", "Kiefergelenk", "TMJ", "Ohrbereich" → pain_ear_jaw
+- "Nacken", "HWS", "Nackenbereich" → pain_neck
+- "Schulter", "Schultergürtel" → pain_shoulder
+
+6. PRAKTISCHE BEISPIELE — EXAKT SO MAPPEN:
+- "Schmerzen Stärke Sieben, Schläfe" → pain_temples_left=true, pain_temples_right=true, pain_temples_vas_left=7, pain_temples_vas_right=7
+- "Kopfschmerz links Stärke 7" → pain_head_left=true, pain_head_vas_left=7
+- "Schläfen rechts VAS 4" → pain_temples_right=true, pain_temples_vas_right=4
+- "Nacken beidseits stark, etwa 8" → alle 4 Felder: pain_neck_left/right=true, pain_neck_vas_left/right=8
+- "Schulter rechts schmerzt sehr stark" (ohne Zahl) → pain_shoulder_right=true (kein VAS gesetzt)
+- "Kein Kopfschmerz" → pain_head_left=false, pain_head_right=false (keine VAS-Werte)
 - Wenn nur boolean genannt ohne Intensität: nur boolean setzen, VAS bleibt null
 pain_other (boolean), pain_other_location (string)
 pain_vas (number 0-10): Schmerzstärke

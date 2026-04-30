@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Mic, MicOff, RotateCcw, AlertTriangle, Activity, Volume2
+  Mic, MicOff, RotateCcw, AlertTriangle, Activity, Volume2, ArrowLeft
 } from 'lucide-react';
 import { FORMS, getForm } from './forms/registry';
 import { AppSidebar } from './components/app-sidebar';
+import { FormSelector } from './components/form-selector';
 import { FloatingDemoPanel } from './components/floating-demo-panel';
+import { PatientsView } from './views/patients-view';
+import { DashboardView, FormsView, HistoryView, SettingsView, HelpView } from './views/main-views';
 
 // ═══════════════════════════════════════════════════════════════════
-//   AUDIO FEEDBACK
+// AUDIO FEEDBACK
 // ═══════════════════════════════════════════════════════════════════
 function useAudioFeedback() {
   const ctxRef = useRef(null);
@@ -33,7 +36,7 @@ function useAudioFeedback() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//   PARSE API CALL
+// PARSE API
 // ═══════════════════════════════════════════════════════════════════
 async function parseUtterance(text, formId) {
   try {
@@ -58,21 +61,25 @@ async function parseUtterance(text, formId) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//   MAIN APP
+// MAIN APP
 // ═══════════════════════════════════════════════════════════════════
 export default function App() {
-  const [activeFormId, setActiveFormId] = useState('cmd-screening');
+  // ROUTING
+  const [route, setRoute] = useState('dashboard');  // dashboard | patients | forms | history | settings | help | exam
+  const [activePatient, setActivePatient] = useState(null);
+
+  // FORM STATE
+  const [activeFormId, setActiveFormId] = useState('funktionsstatus');  // ⬅ Default Funktionsstatus
   const activeForm = getForm(activeFormId);
 
   const [formStates, setFormStates] = useState(() => {
     const initial = {};
-    Object.keys(FORMS).forEach(id => {
-      initial[id] = FORMS[id].getInitial();
-    });
+    Object.keys(FORMS).forEach(id => { initial[id] = FORMS[id].getInitial(); });
     return initial;
   });
   const currentState = formStates[activeFormId];
 
+  // VOICE / UI STATE
   const [transcript, setTranscript] = useState('');
   const [interim, setInterim] = useState('');
   const [log, setLog] = useState([]);
@@ -94,7 +101,6 @@ export default function App() {
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = 'de-DE';
-
     rec.onresult = (event) => {
       let interimText = '', finalText = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -112,14 +118,12 @@ export default function App() {
         interimRef.current = interimText;
       }
     };
-
     rec.onend = () => {
       if (recognitionRef.current?._wantListen) {
         try { rec.start(); } catch (e) {}
       } else { setListening(false); }
     };
     rec.onerror = (e) => { if (e.error !== 'no-speech') console.warn('Speech error:', e.error); };
-
     recognitionRef.current = rec;
     return () => { try { rec.stop(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,16 +160,12 @@ export default function App() {
             formCopy.dynamic_occlusion = dyn;
           } else {
             formCopy[field] = value;
-            // Auto-Sync für Schmerz-VAS-Felder:
-            // Wenn z.B. pain_head_vas_left auf 7 gesetzt wird, auch pain_head_left = true setzen
+            // Auto-Sync VAS ↔ Boolean
             const vasMatch = field.match(/^(pain_\w+)_vas_(left|right)$/);
             if (vasMatch && typeof value === 'number' && value > 0) {
               const boolField = `${vasMatch[1]}_${vasMatch[2]}`;
-              if (formCopy[boolField] !== true) {
-                formCopy[boolField] = true;
-              }
+              if (formCopy[boolField] !== true) formCopy[boolField] = true;
             }
-            // Umgekehrt: Wenn Boolean auf false gesetzt wird, VAS auf null
             const boolMatch = field.match(/^(pain_(?:head|temples|ear_jaw|neck|shoulder))_(left|right)$/);
             if (boolMatch && value === false) {
               const vasField = `${boolMatch[1]}_vas_${boolMatch[2]}`;
@@ -185,13 +185,10 @@ export default function App() {
     const avgConf = updates.length > 0
       ? updates.reduce((s, u) => s + (u.confidence || 1), 0) / updates.length
       : 0;
-
     setLog(l => [{
       text,
       interp: result.interpretation || (updates.length === 0 ? 'kein Befund erkannt' : ''),
-      updates,
-      conf: avgConf,
-      ts: Date.now(),
+      updates, conf: avgConf, ts: Date.now(),
     }, ...l].slice(0, 20));
   };
 
@@ -225,121 +222,234 @@ export default function App() {
     setDemoText('');
   };
 
+  // Form-Wechsel
+  const switchForm = (formId) => {
+    setActiveFormId(formId);
+    setRoute('exam');
+    setLog([]);
+  };
+
+  // Patient + Examination öffnen
+  const openExamination = (patient, exam) => {
+    if (exam) {
+      // Snapshot in den aktuellen State laden
+      setFormStates(s => ({
+        ...s,
+        [exam.formId]: { ...FORMS[exam.formId].getInitial(), ...exam.snapshot },
+      }));
+      setActiveFormId(exam.formId);
+      setActivePatient(patient);
+      setRoute('exam');
+    }
+  };
+
+  const newExaminationForPatient = (patient) => {
+    setActivePatient(patient);
+    setActiveFormId('funktionsstatus');
+    setFormStates(s => ({ ...s, funktionsstatus: FORMS.funktionsstatus.getInitial() }));
+    setRoute('exam');
+  };
+
   const demoUtterances = activeForm.DEMO_UTTERANCES || [];
   const ActiveView = activeForm.View;
   const HasAnatomy = !!activeForm.AnatomyView;
   const AnatomyComp = activeForm.AnatomyView;
 
+  // ═════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* Linke Sidebar — Form-Navigation */}
-      <AppSidebar currentFormId={activeFormId} onChange={setActiveFormId} />
+      <AppSidebar currentRoute={route} onNavigate={setRoute} />
 
-      {/* Rest verschoben um die 64px der Sidebar */}
       <div className="pl-16">
-        {/* Schlanker Header */}
-        <header className="border-b-2 border-slate-300 bg-white sticky top-0 z-40 shadow-sm">
-          <div className="px-6 py-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-2 h-2 rounded-full bg-cyan-600 scan-pulse flex-shrink-0" />
+        {/* HEADER — abhängig von Route */}
+        {route === 'exam' ? (
+          <ExamHeader
+            activeForm={activeForm}
+            activeFormId={activeFormId}
+            switchForm={switchForm}
+            activePatient={activePatient}
+            setActivePatient={setActivePatient}
+            processing={processing}
+            active={active}
+            listening={listening}
+            supportsSpeech={supportsSpeech}
+            transcript={transcript}
+            interim={interim}
+            resetAll={resetAll}
+            toggleListen={toggleListen}
+            onBackToPatient={() => setRoute('patients')}
+          />
+        ) : (
+          <SimpleHeader route={route} />
+        )}
+
+        {/* MAIN CONTENT */}
+        <main>
+          {route === 'dashboard' && (
+            <DashboardView
+              onNavigate={setRoute}
+              onSelectExamination={(exam) => openExamination(exam.patient, exam)}
+            />
+          )}
+          {route === 'patients' && (
+            <PatientsView
+              onSelectPatient={openExamination}
+              onNewExaminationForPatient={newExaminationForPatient}
+            />
+          )}
+          {route === 'forms' && (
+            <FormsView
+              currentFormId={activeFormId}
+              onSelectForm={switchForm}
+            />
+          )}
+          {route === 'history' && <HistoryView />}
+          {route === 'settings' && <SettingsView />}
+          {route === 'help' && <HelpView />}
+
+          {route === 'exam' && (
+            <div className={HasAnatomy
+              ? "px-6 py-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 max-w-[1600px] mx-auto"
+              : "px-6 py-6 max-w-[1200px] mx-auto"
+            }>
               <div className="min-w-0">
-                <div className="text-[10px] tracking-widest text-slate-500 font-mono font-bold uppercase truncate">
-                  {activeForm.formSubtitle}
-                </div>
-                <div className="text-base font-bold tracking-tight text-slate-900 truncate">
-                  {activeForm.formTitle}
-                </div>
+                <ActiveView state={currentState} recentField={recentField} />
               </div>
+              {HasAnatomy && (
+                <aside className="hidden xl:block">
+                  <div className="sticky top-32">
+                    <AnatomyComp state={currentState} recentField={recentField} />
+                  </div>
+                </aside>
+              )}
             </div>
-
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 font-mono text-xs font-bold transition-all ${
-                processing ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
-                : !active ? 'border-amber-500 bg-amber-50 text-amber-900'
-                : listening ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-                : 'border-slate-400 bg-slate-100 text-slate-700'
-              }`}>
-                {processing
-                  ? <><Activity className="w-3 h-3 animate-spin" /><span>parse</span></>
-                  : !active ? <><AlertTriangle className="w-3 h-3" /><span>pausiert</span></>
-                  : listening ? <><Activity className="w-3 h-3" /><span>aktiv</span></>
-                  : <><span className="w-2 h-2 rounded-full bg-slate-500" /><span>idle</span></>
-                }
-              </div>
-
-              <button onClick={resetAll} className="p-2 rounded-lg border-2 border-slate-300 hover:border-slate-500 hover:bg-slate-100" title="Zurücksetzen">
-                <RotateCcw className="w-4 h-4 text-slate-700" />
-              </button>
-
-              <button
-                onClick={toggleListen}
-                disabled={!supportsSpeech}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-                  listening
-                    ? 'bg-rose-600 text-white pulse-mic hover:bg-rose-700'
-                    : supportsSpeech
-                      ? 'bg-cyan-700 text-white hover:bg-cyan-800 shadow-sm'
-                      : 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                }`}
-              >
-                {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                <span>{listening ? 'Stop' : supportsSpeech ? 'Mikrofon' : 'n/a'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Live-Transcript */}
-          <div className="border-t border-slate-200 bg-slate-50">
-            <div className="px-6 py-2 flex items-center gap-3 min-h-[40px]">
-              <Volume2 className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-              <div className="flex-1 font-mono text-sm">
-                {transcript && <span className="text-slate-900 font-bold">{transcript}</span>}
-                {interim && <span className="text-slate-600 italic"> {interim}</span>}
-                {!transcript && !interim && (
-                  <span className="text-slate-600">
-                    {listening ? 'höre zu — sprich natürlich, Smalltalk wird gefiltert' : 'Mikrofon aus — Demo-Eingaben unten rechts'}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Hauptbereich */}
-        <main className={HasAnatomy
-          ? "px-6 py-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 max-w-[1600px] mx-auto"
-          : "px-6 py-6 max-w-[1200px] mx-auto"
-        }>
-          <div className="min-w-0">
-            <ActiveView state={currentState} recentField={recentField} />
-          </div>
-
-          {/* Sticky Anatomie-Panel rechts (nur wenn Form sie hat) */}
-          {HasAnatomy && (
-            <aside className="hidden xl:block">
-              <div className="sticky top-32">
-                <AnatomyComp state={currentState} recentField={recentField} />
-              </div>
-            </aside>
           )}
         </main>
 
         <footer className="px-6 py-6 text-center text-[11px] text-slate-500 max-w-[1200px] mx-auto">
-          VoxDent · Sprachgestützte Befunderfassung · Befundbögen der DGFDT — verwendet gemäß Software-Lizenz der DGFDT
+          VoxDent · Sprachgestützte Befunderfassung · Befundbögen der DGFDT
         </footer>
       </div>
 
-      {/* Floating Demo+Log Panel */}
-      <FloatingDemoPanel
-        demoText={demoText}
-        setDemoText={setDemoText}
-        submitDemo={submitDemo}
-        processing={processing}
-        demoUtterances={demoUtterances}
-        handleUtterance={handleUtterance}
-        log={log}
-        supportsSpeech={supportsSpeech}
-      />
+      {/* Floating Demo+Log Panel — nur in Exam-Ansicht */}
+      {route === 'exam' && (
+        <FloatingDemoPanel
+          demoText={demoText}
+          setDemoText={setDemoText}
+          submitDemo={submitDemo}
+          processing={processing}
+          demoUtterances={demoUtterances}
+          handleUtterance={handleUtterance}
+          log={log}
+          supportsSpeech={supportsSpeech}
+        />
+      )}
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HEADER VARIANTEN
+// ═══════════════════════════════════════════════════════════════════
+
+function SimpleHeader({ route }) {
+  const titles = {
+    dashboard: 'Dashboard',
+    patients: 'Patienten',
+    forms: 'Befundbögen',
+    history: 'Verlauf',
+    settings: 'Einstellungen',
+    help: 'Hilfe',
+  };
+  return (
+    <header className="border-b-2 border-slate-300 bg-white sticky top-0 z-40 shadow-sm">
+      <div className="px-6 py-4 flex items-center gap-3">
+        <div className="w-2 h-2 rounded-full bg-cyan-600" />
+        <div className="text-sm font-bold tracking-tight text-slate-900">
+          VoxDent
+        </div>
+        <div className="text-slate-300">›</div>
+        <div className="text-base font-bold text-slate-900">{titles[route] || ''}</div>
+      </div>
+    </header>
+  );
+}
+
+function ExamHeader({
+  activeForm, activeFormId, switchForm,
+  activePatient, setActivePatient,
+  processing, active, listening, supportsSpeech,
+  transcript, interim, resetAll, toggleListen,
+  onBackToPatient,
+}) {
+  return (
+    <header className="border-b-2 border-slate-300 bg-white sticky top-0 z-40 shadow-sm">
+      <div className="px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          {activePatient && (
+            <button
+              onClick={onBackToPatient}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 flex-shrink-0"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{activePatient.firstName} {activePatient.lastName}</span>
+            </button>
+          )}
+          <FormSelector currentFormId={activeFormId} onChange={switchForm} />
+        </div>
+
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 font-mono text-xs font-bold transition-all ${
+            processing ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
+            : !active ? 'border-amber-500 bg-amber-50 text-amber-900'
+            : listening ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+            : 'border-slate-400 bg-slate-100 text-slate-700'
+          }`}>
+            {processing
+              ? <><Activity className="w-3 h-3 animate-spin" /><span>parse</span></>
+              : !active ? <><AlertTriangle className="w-3 h-3" /><span>pausiert</span></>
+              : listening ? <><Activity className="w-3 h-3" /><span>aktiv</span></>
+              : <><span className="w-2 h-2 rounded-full bg-slate-500" /><span>idle</span></>
+            }
+          </div>
+
+          <button onClick={resetAll} className="p-2 rounded-lg border-2 border-slate-300 hover:border-slate-500 hover:bg-slate-100" title="Zurücksetzen">
+            <RotateCcw className="w-4 h-4 text-slate-700" />
+          </button>
+
+          <button
+            onClick={toggleListen}
+            disabled={!supportsSpeech}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+              listening
+                ? 'bg-rose-600 text-white pulse-mic hover:bg-rose-700'
+                : supportsSpeech
+                  ? 'bg-cyan-700 text-white hover:bg-cyan-800 shadow-sm'
+                  : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+            }`}
+          >
+            {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            <span>{listening ? 'Stop' : supportsSpeech ? 'Mikrofon' : 'n/a'}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 bg-slate-50">
+        <div className="px-6 py-2 flex items-center gap-3 min-h-[40px]">
+          <Volume2 className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+          <div className="flex-1 font-mono text-sm">
+            {transcript && <span className="text-slate-900 font-bold">{transcript}</span>}
+            {interim && <span className="text-slate-600 italic"> {interim}</span>}
+            {!transcript && !interim && (
+              <span className="text-slate-600">
+                {listening ? 'höre zu — sprich natürlich, Smalltalk wird gefiltert' : 'Mikrofon aus — Demo-Eingaben unten rechts'}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
   );
 }
