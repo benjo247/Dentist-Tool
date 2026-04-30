@@ -647,12 +647,43 @@ export function View({ state: form, recentField }) {
             )}
           </SectionCard>
 
-          {/* ═══════════ 13 MYOSA TMJBDS ═══════════ */}
-          <SectionCard num="13" title="Myosa® TMJBDS · Patientenauswertung" recentField={recentField}
-            fields={['myosa_']}>
+          {/* ═══════════ 13 PATIENTENAUSWERTUNG SCHIENENTHERAPIE ═══════════ */}
+          <SectionCard num="13" title="Patientenauswertung Schienentherapie" recentField={recentField}
+            fields={['splint_']}>
+            {/* Hersteller-Auswahl */}
+            <div className={`mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg ${(isHot('splint_manufacturer') || isHot('splint_manufacturer_other')) ? 'animate-flash' : ''}`}>
+              <SubLabel>SCHIENEN-SYSTEM</SubLabel>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                {[
+                  ['myosa', 'Myosa®'],
+                  ['osa', 'OSA'],
+                  ['aqualizer', 'Aqualizer®'],
+                  ['sci', 'SCi™'],
+                  ['other', 'Andere'],
+                ].map(([key, label]) => {
+                  const selected = form.splint_manufacturer === key;
+                  return (
+                    <span key={key} className={`px-3 py-1 rounded-md text-sm font-mono font-bold border-2 ${
+                      selected ? 'bg-cyan-600 text-white border-cyan-700' : 'bg-white text-slate-500 border-slate-300'
+                    }`}>
+                      {label}
+                    </span>
+                  );
+                })}
+                {form.splint_manufacturer === 'other' && form.splint_manufacturer_other && (
+                  <span className="text-sm text-slate-700 font-medium ml-2">
+                    → {form.splint_manufacturer_other}
+                  </span>
+                )}
+                {!form.splint_manufacturer && (
+                  <span className="text-xs text-slate-400 ml-2">noch nicht erfasst</span>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-4">
-              <FreitextField value={form.myosa_main_complaints} label="HAUPTBESCHWERDEN" hot={isHot('myosa_main_complaints')} lines={3} />
-              <FreitextField value={form.myosa_treatment_goals} label="BEHANDLUNGSZIELE" hot={isHot('myosa_treatment_goals')} lines={3} />
+              <FreitextField value={form.splint_main_complaints} label="HAUPTBESCHWERDEN" hot={isHot('splint_main_complaints')} lines={3} />
+              <FreitextField value={form.splint_treatment_goals} label="BEHANDLUNGSZIELE" hot={isHot('splint_treatment_goals')} lines={3} />
             </div>
 
             <div className="border-t border-slate-200 pt-4">
@@ -670,80 +701,80 @@ export function View({ state: form, recentField }) {
                   ['atypical_facial_pain', 'Atypischer Gesichtsschmerz · M. Masseter / Buccinator'],
                 ].map(([key, label]) => (
                   <React.Fragment key={key}>
-                    <div className={`text-sm text-slate-800 font-medium ${(isHot(`myosa_${key}`) || isHot(`myosa_${key}_intensity`)) ? 'animate-flash' : ''}`}>{label}</div>
-                    <div className="flex justify-center"><YesNoIndicator value={form[`myosa_${key}`]} /></div>
-                    <div className="flex justify-center"><ValuePill value={form[`myosa_${key === 'ear_pain_tinnitus' ? 'ear_pain' : key === 'atypical_facial_pain' ? 'facial_pain' : key}_intensity`]} unit="/10" /></div>
+                    <div className={`text-sm text-slate-800 font-medium ${(isHot(`splint_${key}`) || isHot(`splint_${key}_intensity`)) ? 'animate-flash' : ''}`}>{label}</div>
+                    <div className="flex justify-center"><YesNoIndicator value={form[`splint_${key}`]} /></div>
+                    <div className="flex justify-center"><ValuePill value={form[`splint_${key === 'ear_pain_tinnitus' ? 'ear_pain' : key === 'atypical_facial_pain' ? 'facial_pain' : key}_intensity`]} unit="/10" /></div>
                   </React.Fragment>
                 ))}
               </div>
-              <div className={`mt-3 flex items-center justify-between ${isHot('myosa_max_opening_mm') ? 'animate-flash' : ''}`}>
+              <div className={`mt-3 flex items-center justify-between ${isHot('splint_max_opening_mm') ? 'animate-flash' : ''}`}>
                 <span className="text-sm text-slate-700 font-medium">Max. Mundöffnung</span>
-                <ValuePill value={form.myosa_max_opening_mm} unit="mm" big />
+                <ValuePill value={form.splint_max_opening_mm} unit="mm" big />
               </div>
             </div>
 
             <div className="border-t border-slate-200 pt-4 mt-4 grid grid-cols-3 gap-x-6">
               <div>
                 <SubLabel>ATMUNG</SubLabel>
-                <FieldRow label="Modus" hot={isHot('myosa_breathing_mode')}>
+                <FieldRow label="Modus" hot={isHot('splint_breathing_mode')}>
                   <span className="font-mono text-sm font-bold text-slate-900">
-                    {form.myosa_breathing_mode === 'nasal' ? 'nasal' :
-                     form.myosa_breathing_mode === 'mouth' ? 'Mund' :
+                    {form.splint_breathing_mode === 'nasal' ? 'nasal' :
+                     form.splint_breathing_mode === 'mouth' ? 'Mund' :
                      <span className="text-slate-400">–</span>}
                   </span>
                 </FieldRow>
-                <FieldRow label="Lippenschluss" hot={isHot('myosa_lip_closure')}>
-                  <YesNoIndicator value={form.myosa_lip_closure} />
+                <FieldRow label="Lippenschluss" hot={isHot('splint_lip_closure')}>
+                  <YesNoIndicator value={form.splint_lip_closure} />
                 </FieldRow>
-                <FieldRow label="Tonsillen (0–4)" hot={isHot('myosa_tonsils_grade')}>
-                  <ValuePill value={form.myosa_tonsils_grade} />
+                <FieldRow label="Tonsillen (0–4)" hot={isHot('splint_tonsils_grade')}>
+                  <ValuePill value={form.splint_tonsils_grade} />
                 </FieldRow>
               </div>
               <div>
                 <SubLabel>SCHLAF</SubLabel>
-                <Checkbox value={form.myosa_snoring} label="Schnarchen" hot={isHot('myosa_snoring')} />
-                <Checkbox value={form.myosa_apnea} label="Apnoe" hot={isHot('myosa_apnea')} />
-                <Checkbox value={form.myosa_restless_sleep} label="Unruhig" hot={isHot('myosa_restless_sleep')} />
-                <Checkbox value={form.myosa_morning_fatigue} label="Morg. Müdigkeit" hot={isHot('myosa_morning_fatigue')} />
-                <Checkbox value={form.myosa_sleep_study_done} label="Schlafstudie erfolgt" hot={isHot('myosa_sleep_study_done')} />
+                <Checkbox value={form.splint_snoring} label="Schnarchen" hot={isHot('splint_snoring')} />
+                <Checkbox value={form.splint_apnea} label="Apnoe" hot={isHot('splint_apnea')} />
+                <Checkbox value={form.splint_restless_sleep} label="Unruhig" hot={isHot('splint_restless_sleep')} />
+                <Checkbox value={form.splint_morning_fatigue} label="Morg. Müdigkeit" hot={isHot('splint_morning_fatigue')} />
+                <Checkbox value={form.splint_sleep_study_done} label="Schlafstudie erfolgt" hot={isHot('splint_sleep_study_done')} />
               </div>
               <div>
                 <SubLabel>HALTUNG</SubLabel>
-                <Checkbox value={form.myosa_posture_head_forward} label="Kopf nach vorn" hot={isHot('myosa_posture_head_forward')} />
-                <Checkbox value={form.myosa_posture_pelvic_tilt} label="Beckenschiefstand" hot={isHot('myosa_posture_pelvic_tilt')} />
-                <Checkbox value={form.myosa_posture_shoulder_drop} label="Schultertiefstand" hot={isHot('myosa_posture_shoulder_drop')} />
+                <Checkbox value={form.splint_posture_head_forward} label="Kopf nach vorn" hot={isHot('splint_posture_head_forward')} />
+                <Checkbox value={form.splint_posture_pelvic_tilt} label="Beckenschiefstand" hot={isHot('splint_posture_pelvic_tilt')} />
+                <Checkbox value={form.splint_posture_shoulder_drop} label="Schultertiefstand" hot={isHot('splint_posture_shoulder_drop')} />
               </div>
             </div>
 
             <div className="border-t border-slate-200 pt-4 mt-4">
               <SubLabel>MYOFUNKTIONELLE ANALYSE (SOFT TISSUE)</SubLabel>
               <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                <FieldRow label="Zungenposition" hot={isHot('myosa_tongue_position')}>
+                <FieldRow label="Zungenposition" hot={isHot('splint_tongue_position')}>
                   <span className="font-mono text-sm font-bold text-slate-900">
-                    {form.myosa_tongue_position === 'low' ? 'tief' :
-                     form.myosa_tongue_position === 'interdental' ? 'interdental' :
-                     form.myosa_tongue_position === 'correct' ? 'richtig' :
-                     form.myosa_tongue_position === 'high' ? 'hoch' :
+                    {form.splint_tongue_position === 'low' ? 'tief' :
+                     form.splint_tongue_position === 'interdental' ? 'interdental' :
+                     form.splint_tongue_position === 'correct' ? 'richtig' :
+                     form.splint_tongue_position === 'high' ? 'hoch' :
                      <span className="text-slate-400">–</span>}
                   </span>
                 </FieldRow>
-                <Checkbox value={form.myosa_tongue_correction_needed} label="Zungen-Korrekturbedarf" hot={isHot('myosa_tongue_correction_needed')} />
-                <FieldRow label="Wangenmuskeln" hot={isHot('myosa_cheek_muscles')}>
+                <Checkbox value={form.splint_tongue_correction_needed} label="Zungen-Korrekturbedarf" hot={isHot('splint_tongue_correction_needed')} />
+                <FieldRow label="Wangenmuskeln" hot={isHot('splint_cheek_muscles')}>
                   <span className="font-mono text-sm font-bold text-slate-900">
-                    {form.myosa_cheek_muscles === 'hypertonic' ? 'hyperton' :
-                     form.myosa_cheek_muscles === 'hypotonic' ? 'hypoton' :
-                     form.myosa_cheek_muscles === 'normal' ? 'normal' :
+                    {form.splint_cheek_muscles === 'hypertonic' ? 'hyperton' :
+                     form.splint_cheek_muscles === 'hypotonic' ? 'hypoton' :
+                     form.splint_cheek_muscles === 'normal' ? 'normal' :
                      <span className="text-slate-400">–</span>}
                   </span>
                 </FieldRow>
-                <Checkbox value={form.myosa_cheek_exercises_needed} label="Wangen-Übungen empfohlen" hot={isHot('myosa_cheek_exercises_needed')} />
+                <Checkbox value={form.splint_cheek_exercises_needed} label="Wangen-Übungen empfohlen" hot={isHot('splint_cheek_exercises_needed')} />
               </div>
               <div className="mt-2">
                 <SubLabel>SCHLUCKREFLEX</SubLabel>
                 <div className="flex flex-wrap gap-x-4">
-                  <Checkbox value={form.myosa_swallow_tongue_thrust} label="Zungenstoß" hot={isHot('myosa_swallow_tongue_thrust')} />
-                  <Checkbox value={form.myosa_swallow_mentalis_activity} label="Mentalis-Aktivität" hot={isHot('myosa_swallow_mentalis_activity')} />
-                  <Checkbox value={form.myosa_swallow_myofunctional_therapy_needed} label="Myofunkt. Therapie empfohlen" hot={isHot('myosa_swallow_myofunctional_therapy_needed')} />
+                  <Checkbox value={form.splint_swallow_tongue_thrust} label="Zungenstoß" hot={isHot('splint_swallow_tongue_thrust')} />
+                  <Checkbox value={form.splint_swallow_mentalis_activity} label="Mentalis-Aktivität" hot={isHot('splint_swallow_mentalis_activity')} />
+                  <Checkbox value={form.splint_swallow_myofunctional_therapy_needed} label="Myofunkt. Therapie empfohlen" hot={isHot('splint_swallow_myofunctional_therapy_needed')} />
                 </div>
               </div>
             </div>
@@ -751,27 +782,27 @@ export function View({ state: form, recentField }) {
             <div className="border-t border-slate-200 pt-4 mt-4">
               <SubLabel>DENTALER & SKELETTALER STATUS</SubLabel>
               <div className="grid grid-cols-4 gap-3">
-                <FieldRow label="Oberkiefer" hot={isHot('myosa_maxilla_shape')}>
+                <FieldRow label="Oberkiefer" hot={isHot('splint_maxilla_shape')}>
                   <span className="font-mono text-sm font-bold text-slate-900">
-                    {form.myosa_maxilla_shape === 'v_form' ? 'V-Form' :
-                     form.myosa_maxilla_shape === 'u_form' ? 'U-Form' :
+                    {form.splint_maxilla_shape === 'v_form' ? 'V-Form' :
+                     form.splint_maxilla_shape === 'u_form' ? 'U-Form' :
                      <span className="text-slate-400">–</span>}
                   </span>
                 </FieldRow>
-                <FieldRow label="Engstand" hot={isHot('myosa_crowding')}>
-                  <YesNoIndicator value={form.myosa_crowding} />
+                <FieldRow label="Engstand" hot={isHot('splint_crowding')}>
+                  <YesNoIndicator value={form.splint_crowding} />
                 </FieldRow>
-                <FieldRow label="Klasse" hot={isHot('myosa_class')}>
+                <FieldRow label="Klasse" hot={isHot('splint_class')}>
                   <span className="font-mono text-sm font-bold text-slate-900">
-                    {form.myosa_class || <span className="text-slate-400">–</span>}
+                    {form.splint_class || <span className="text-slate-400">–</span>}
                   </span>
                 </FieldRow>
-                <FieldRow label="Biss" hot={isHot('myosa_bite')}>
+                <FieldRow label="Biss" hot={isHot('splint_bite')}>
                   <span className="font-mono text-sm font-bold text-slate-900">
-                    {form.myosa_bite === 'deep' ? 'tief' :
-                     form.myosa_bite === 'cross' ? 'Kreuz' :
-                     form.myosa_bite === 'open' ? 'offen' :
-                     form.myosa_bite === 'normal' ? 'normal' :
+                    {form.splint_bite === 'deep' ? 'tief' :
+                     form.splint_bite === 'cross' ? 'Kreuz' :
+                     form.splint_bite === 'open' ? 'offen' :
+                     form.splint_bite === 'normal' ? 'normal' :
                      <span className="text-slate-400">–</span>}
                   </span>
                 </FieldRow>
@@ -779,8 +810,8 @@ export function View({ state: form, recentField }) {
             </div>
 
             <div className="border-t border-slate-200 pt-4 mt-4 space-y-3">
-              <FreitextField value={form.myosa_recommended_appliance} label="EMPFOHLENE MYOSA®-APPARATUR" hot={isHot('myosa_recommended_appliance')} lines={1} />
-              <FreitextField value={form.myosa_special_notes} label="BESONDERE ANMERKUNGEN" hot={isHot('myosa_special_notes')} lines={2} />
+              <FreitextField value={form.splint_recommended_appliance} label="EMPFOHLENE APPARATUR" hot={isHot('splint_recommended_appliance')} lines={1} />
+              <FreitextField value={form.splint_special_notes} label="BESONDERE ANMERKUNGEN" hot={isHot('splint_special_notes')} lines={2} />
             </div>
           </SectionCard>
       </div>
@@ -795,7 +826,8 @@ export function View({ state: form, recentField }) {
           © Ottl, Ahlers, Lange, Utz, Reiber 2011 · DGFDT/DGZMK · Stand 01/2012
         </p>
         <p className="mt-1 text-slate-400">
-          Sektion 13 (Myosa® TMJBDS) © Myofunctional Research Co.
+          Sektion 13 (Patientenauswertung Schienentherapie) — herstellerneutral.
+          Markennamen (Myosa®, OSA, Aqualizer®, SCi™) sind Eigentum der jeweiligen Inhaber.
         </p>
       </div>
     </div>

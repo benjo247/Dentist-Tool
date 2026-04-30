@@ -172,53 +172,61 @@ Beispiel: { "16": "K", "26": "F", "36": "f" }
 
 treatment_planning_notes (string)
 
-— MYOSA TMJBDS PATIENTENAUSWERTUNG —
+— PATIENTENAUSWERTUNG SCHIENENTHERAPIE —
+
+splint_manufacturer ("myosa"|"osa"|"aqualizer"|"sci"|"other"): Hersteller der Schiene
+  - "Myosa" / "MRC" / "TMJBDS" → "myosa"
+  - "OSA" / "OSA-Schiene" → "osa"
+  - "Aqualizer" → "aqualizer"
+  - "SCi" / "SCi-Schiene" → "sci"
+  - alles andere → "other"
+splint_manufacturer_other (string): Freitext wenn andere Schiene als die gelisteten
 Kopfdaten:
-myosa_main_complaints (string): Hauptbeschwerden (mehrzeilig erlaubt)
-myosa_treatment_goals (string): Behandlungsziele (mehrzeilig erlaubt)
+splint_main_complaints (string): Hauptbeschwerden (mehrzeilig erlaubt)
+splint_treatment_goals (string): Behandlungsziele (mehrzeilig erlaubt)
 
 Symptome (jeweils boolean für "vorhanden", number 0-10 für Intensität):
-myosa_headache (bool), myosa_headache_intensity (number 0-10)
-myosa_neck_pain (bool), myosa_neck_pain_intensity (number 0-10)
-myosa_joint_clicking (bool), myosa_joint_clicking_intensity (number 0-10)
-myosa_limited_opening (bool), myosa_limited_opening_intensity (number 0-10)
-myosa_max_opening_mm (number): Max. Öffnung in Millimeter
-myosa_ear_pain_tinnitus (bool), myosa_ear_pain_intensity (number 0-10)
-myosa_atypical_facial_pain (bool), myosa_facial_pain_intensity (number 0-10)
+splint_headache (bool), splint_headache_intensity (number 0-10)
+splint_neck_pain (bool), splint_neck_pain_intensity (number 0-10)
+splint_joint_clicking (bool), splint_joint_clicking_intensity (number 0-10)
+splint_limited_opening (bool), splint_limited_opening_intensity (number 0-10)
+splint_max_opening_mm (number): Max. Öffnung in Millimeter
+splint_ear_pain_tinnitus (bool), splint_ear_pain_intensity (number 0-10)
+splint_atypical_facial_pain (bool), splint_facial_pain_intensity (number 0-10)
 
 Atmung:
-myosa_breathing_mode ("nasal"|"mouth")
-myosa_lip_closure (boolean)
-myosa_tonsils_grade (number 0-4)
+splint_breathing_mode ("nasal"|"mouth")
+splint_lip_closure (boolean)
+splint_tonsils_grade (number 0-4)
 
 Schlaf:
-myosa_snoring (boolean)
-myosa_apnea (boolean)
-myosa_restless_sleep (boolean)
-myosa_morning_fatigue (boolean)
-myosa_sleep_study_done (boolean)
+splint_snoring (boolean)
+splint_apnea (boolean)
+splint_restless_sleep (boolean)
+splint_morning_fatigue (boolean)
+splint_sleep_study_done (boolean)
 
 Myofunktionelle Analyse:
-myosa_tongue_position ("low"|"interdental"|"correct"|"high")
-myosa_tongue_correction_needed (boolean)
-myosa_swallow_tongue_thrust (boolean)
-myosa_swallow_mentalis_activity (boolean)
-myosa_swallow_myofunctional_therapy_needed (boolean)
-myosa_cheek_muscles ("hypertonic"|"hypotonic"|"normal")
-myosa_cheek_exercises_needed (boolean)
+splint_tongue_position ("low"|"interdental"|"correct"|"high")
+splint_tongue_correction_needed (boolean)
+splint_swallow_tongue_thrust (boolean)
+splint_swallow_mentalis_activity (boolean)
+splint_swallow_myofunctional_therapy_needed (boolean)
+splint_cheek_muscles ("hypertonic"|"hypotonic"|"normal")
+splint_cheek_exercises_needed (boolean)
 
 Dentaler & Skelettaler Status:
-myosa_maxilla_shape ("v_form"|"u_form")
-myosa_crowding (boolean)
-myosa_class ("I"|"II"|"III")
-myosa_bite ("deep"|"cross"|"open"|"normal")
+splint_maxilla_shape ("v_form"|"u_form")
+splint_crowding (boolean)
+splint_class ("I"|"II"|"III")
+splint_bite ("deep"|"cross"|"open"|"normal")
 
 Weitere Diagnostik:
-myosa_posture_head_forward (boolean)
-myosa_posture_pelvic_tilt (boolean)
-myosa_posture_shoulder_drop (boolean)
-myosa_recommended_appliance (string): Empfohlene Myosa-Apparatur (Freitext)
-myosa_special_notes (string): Besondere Anmerkungen (Freitext)
+splint_posture_head_forward (boolean)
+splint_posture_pelvic_tilt (boolean)
+splint_posture_shoulder_drop (boolean)
+splint_recommended_appliance (string): Empfohlene Apparatur/Schiene (Freitext)
+splint_special_notes (string): Besondere Anmerkungen (Freitext)
 
 ═══════════════════════════════════════════════════
 REGELN
