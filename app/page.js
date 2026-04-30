@@ -346,10 +346,8 @@ export default function App() {
                 <ActiveView state={currentState} recentField={recentField} updateField={updateField} />
               </div>
               {HasAnatomy && (
-                <aside className="hidden xl:block">
-                  <div className="sticky top-32">
-                    <AnatomyComp state={currentState} recentField={recentField} />
-                  </div>
+                <aside className="block xl:sticky xl:top-32 xl:self-start">
+                  <AnatomyComp state={currentState} recentField={recentField} />
                 </aside>
               )}
             </div>
