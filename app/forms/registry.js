@@ -22,6 +22,7 @@ export const FORMS = {
     getInitial: funktionsstatus.getInitial,
     getPrompt: funktionsstatus.getPrompt,
     View: funktionsstatus.View,
+    AnatomyView: funktionsstatus.AnatomyView,
     DEMO_UTTERANCES: funktionsstatus.DEMO_UTTERANCES || [],
   },
   'cmd-screening': {

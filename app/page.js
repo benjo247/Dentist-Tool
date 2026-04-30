@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Mic, MicOff, RotateCcw, Check, AlertTriangle, Activity,
-  Sparkles, Volume2, FileText
+  Mic, MicOff, RotateCcw, AlertTriangle, Activity, Volume2
 } from 'lucide-react';
-import { FORMS, listForms, getForm } from './forms/registry';
-import { FormSwitcher } from './components/form-switcher';
+import { FORMS, getForm } from './forms/registry';
+import { AppSidebar } from './components/app-sidebar';
+import { FloatingDemoPanel } from './components/floating-demo-panel';
 
 // ═══════════════════════════════════════════════════════════════════
 //   AUDIO FEEDBACK
@@ -61,11 +61,9 @@ async function parseUtterance(text, formId) {
 //   MAIN APP
 // ═══════════════════════════════════════════════════════════════════
 export default function App() {
-  // Form-Auswahl
   const [activeFormId, setActiveFormId] = useState('cmd-screening');
   const activeForm = getForm(activeFormId);
 
-  // Form-State pro Form (so geht beim Wechsel nichts verloren)
   const [formStates, setFormStates] = useState(() => {
     const initial = {};
     Object.keys(FORMS).forEach(id => {
@@ -75,7 +73,6 @@ export default function App() {
   });
   const currentState = formStates[activeFormId];
 
-  // Voice / UI State
   const [transcript, setTranscript] = useState('');
   const [interim, setInterim] = useState('');
   const [log, setLog] = useState([]);
@@ -89,7 +86,6 @@ export default function App() {
   const interimRef = useRef('');
   const beep = useAudioFeedback();
 
-  // ─── Speech Recognition Setup ──────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -129,7 +125,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Utterance Handler ─────────────────────────────────
   const handleUtterance = async (text) => {
     if (!text || !active) return;
     setProcessing(true);
@@ -152,7 +147,6 @@ export default function App() {
         const formCopy = { ...next[activeFormId] };
         updates.forEach(({ field, value }) => {
           if (field === 'auscultation_event') {
-            // Spezialfall Funktionsstatus
             formCopy.auscultation_events = [...(formCopy.auscultation_events || []), value];
           } else if (field === 'static_occlusion' || field === 'supply_chart') {
             formCopy[field] = { ...(formCopy[field] || {}), ...value };
@@ -167,7 +161,6 @@ export default function App() {
         next[activeFormId] = formCopy;
         return next;
       });
-      // Highlight letztes Feld
       const lastField = updates[updates.length - 1].field;
       setRecentField(lastField);
       setTimeout(() => setRecentField(null), 1500);
@@ -187,14 +180,12 @@ export default function App() {
     }, ...l].slice(0, 20));
   };
 
-  // ─── Buttons ───────────────────────────────────────────
   const toggleListen = () => {
     if (!supportsSpeech || !recognitionRef.current) return;
     const rec = recognitionRef.current;
     if (listening) {
       rec._wantListen = false;
       try { rec.stop(); } catch {}
-      // Letzten Interim-Text noch verarbeiten
       const remaining = interimRef.current.trim();
       if (remaining) { handleUtterance(remaining); setTranscript(remaining); setInterim(''); interimRef.current = ''; }
       setListening(false);
@@ -219,191 +210,121 @@ export default function App() {
     setDemoText('');
   };
 
-  // Demo-Sätze des aktiven Formulars (falls vorhanden)
   const demoUtterances = activeForm.DEMO_UTTERANCES || [];
-
-  // ═══════════════════════════════════════════════════════
-  //   RENDER
-  // ═══════════════════════════════════════════════════════
   const ActiveView = activeForm.View;
+  const HasAnatomy = !!activeForm.AnatomyView;
+  const AnatomyComp = activeForm.AnatomyView;
 
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* ═══════════ HEADER ═══════════ */}
-      <header className="border-b-2 border-slate-300 bg-white sticky top-0 z-40 shadow-sm">
-        <div className="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-cyan-600 scan-pulse" />
-              <div className="text-sm font-bold tracking-tight text-slate-900">VoxDent</div>
-              <div className="text-[10px] tracking-widest text-slate-500 font-mono uppercase">Sprach-Erfassung</div>
-            </div>
-            <FormSwitcher currentFormId={activeFormId} onChange={setActiveFormId} />
-          </div>
+      {/* Linke Sidebar — Form-Navigation */}
+      <AppSidebar currentFormId={activeFormId} onChange={setActiveFormId} />
 
-          <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 font-mono text-xs font-bold transition-all ${
-              processing ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
-              : !active ? 'border-amber-500 bg-amber-50 text-amber-900'
-              : listening ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-              : 'border-slate-400 bg-slate-100 text-slate-700'
-            }`}>
-              {processing
-                ? <><Activity className="w-3 h-3 animate-spin" /><span>parse</span></>
-                : !active ? <><AlertTriangle className="w-3 h-3" /><span>pausiert</span></>
-                : listening ? <><Activity className="w-3 h-3" /><span>aktiv</span></>
-                : <><span className="w-2 h-2 rounded-full bg-slate-500" /><span>idle</span></>
-              }
-            </div>
-
-            <button onClick={resetAll} className="p-2 rounded-lg border-2 border-slate-300 hover:border-slate-500 hover:bg-slate-100" title="Zurücksetzen">
-              <RotateCcw className="w-4 h-4 text-slate-700" />
-            </button>
-
-            <button
-              onClick={toggleListen}
-              disabled={!supportsSpeech}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-                listening
-                  ? 'bg-rose-600 text-white pulse-mic hover:bg-rose-700'
-                  : supportsSpeech
-                    ? 'bg-cyan-700 text-white hover:bg-cyan-800 shadow-sm'
-                    : 'bg-slate-200 text-slate-500 cursor-not-allowed'
-              }`}
-            >
-              {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              <span>{listening ? 'Stop' : supportsSpeech ? 'Mikrofon' : 'nicht verfügbar'}</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="border-t border-slate-200 bg-slate-50">
-          <div className="max-w-[1400px] mx-auto px-6 py-2.5 flex items-center gap-3 min-h-[44px]">
-            <Volume2 className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-            <div className="flex-1 font-mono text-sm">
-              {transcript && <span className="text-slate-900 font-bold">{transcript}</span>}
-              {interim && <span className="text-slate-600 italic"> {interim}</span>}
-              {!transcript && !interim && (
-                <span className="text-slate-600">
-                  {listening ? 'höre zu — sprich natürlich, Smalltalk wird gefiltert' : 'Mikrofon aus — oder Beispiele rechts testen'}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-[1400px] mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-
-        {/* Form-spezifische View */}
-        <div>
-          <ActiveView state={currentState} recentField={recentField} />
-        </div>
-
-        {/* Generische Sidebar */}
-        <aside className="space-y-4 lg:sticky lg:top-32 self-start">
-          {/* Form-Info Card */}
-          <div className="rounded-xl border-2 border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="w-3.5 h-3.5 text-cyan-700" />
-              <div className="text-[10px] tracking-widest text-slate-700 font-mono font-bold uppercase">Aktiver Bogen</div>
-            </div>
-            <div className="text-sm font-bold text-slate-900 mb-1">{activeForm.formTitle}</div>
-            <div className="text-xs text-slate-600 leading-snug">{activeForm.formSubtitle}</div>
-            <div className="mt-3 pt-3 border-t border-slate-200 text-[10px] text-slate-500 leading-relaxed">
-              <div>{activeForm.copyright}</div>
-              <div className="mt-1 text-slate-400">{activeForm.source}</div>
-            </div>
-          </div>
-
-          {/* Test-Eingabe */}
-          <div className="rounded-xl border-2 border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-700" />
-              <div className="text-[10px] tracking-widest text-slate-700 font-mono font-bold uppercase">Test-Eingabe</div>
-            </div>
-            {!supportsSpeech && (
-              <div className="mb-3 px-3 py-2 rounded-md bg-amber-50 border-2 border-amber-300 text-xs text-amber-900 font-medium">
-                Browser unterstützt keine Spracherkennung. Nutze die Texteingabe.
-              </div>
-            )}
-            <textarea
-              value={demoText}
-              onChange={e => setDemoText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitDemo(); } }}
-              placeholder="Befund-Aussage eingeben…"
-              rows={3}
-              className="w-full bg-slate-50 border-2 border-slate-300 rounded-md px-3 py-2 text-sm font-mono text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-600 focus:bg-white resize-none"
-            />
-            <button
-              onClick={submitDemo}
-              disabled={!demoText.trim() || processing}
-              className="mt-2 w-full py-2 rounded-md bg-cyan-700 text-white text-sm font-bold hover:bg-cyan-800 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-sm"
-            >
-              Verarbeiten
-            </button>
-            {demoUtterances.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-slate-200">
-                <div className="text-[10px] tracking-widest text-slate-700 font-mono font-bold mb-2">BEISPIELE · KLICKEN</div>
-                <div className="space-y-0.5 max-h-[300px] overflow-y-auto pr-1">
-                  {demoUtterances.map((u, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { handleUtterance(u); }}
-                      disabled={processing}
-                      className="w-full text-left px-2.5 py-1.5 rounded text-xs text-slate-800 hover:text-slate-900 hover:bg-cyan-50 transition disabled:opacity-40 leading-snug"
-                    >
-                      <span className="text-cyan-700 font-bold mr-1.5">›</span>{u}
-                    </button>
-                  ))}
+      {/* Rest verschoben um die 64px der Sidebar */}
+      <div className="pl-16">
+        {/* Schlanker Header */}
+        <header className="border-b-2 border-slate-300 bg-white sticky top-0 z-40 shadow-sm">
+          <div className="px-6 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-2 h-2 rounded-full bg-cyan-600 scan-pulse flex-shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[10px] tracking-widest text-slate-500 font-mono font-bold uppercase truncate">
+                  {activeForm.formSubtitle}
+                </div>
+                <div className="text-base font-bold tracking-tight text-slate-900 truncate">
+                  {activeForm.formTitle}
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Parse-Log */}
-          <div className="rounded-xl border-2 border-slate-200 bg-white p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Activity className="w-3.5 h-3.5 text-slate-700" />
-              <div className="text-[10px] tracking-widest text-slate-700 font-mono font-bold uppercase">Parse-Log</div>
             </div>
-            {log.length === 0 ? (
-              <div className="text-xs text-slate-500 py-4 text-center">noch keine Eingaben</div>
-            ) : (
-              <div className="space-y-2.5 max-h-[400px] overflow-y-auto">
-                {log.map((entry) => (
-                  <div key={entry.ts} className="pb-2.5 border-b border-slate-200 last:border-0">
-                    <div className="flex items-start gap-2 mb-1">
-                      {entry.cmd ? (
-                        <Sparkles className="w-3.5 h-3.5 text-amber-700 mt-1 shrink-0" />
-                      ) : entry.updates.length === 0 ? (
-                        <AlertTriangle className="w-3.5 h-3.5 text-slate-500 mt-1 shrink-0" />
-                      ) : (
-                        <Check className={`w-3.5 h-3.5 mt-1 shrink-0 ${
-                          entry.conf > 0.85 ? 'text-emerald-700' : entry.conf > 0.6 ? 'text-amber-700' : 'text-rose-700'
-                        }`} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-mono text-slate-900 leading-relaxed font-semibold">{entry.text}</div>
-                        <div className="text-[11px] text-slate-700 mt-0.5">
-                          {entry.interp}
-                          {entry.updates.length > 0 && (
-                            <span className="text-slate-600"> · {entry.updates.length} Feld{entry.updates.length !== 1 ? 'er' : ''}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </aside>
-      </main>
 
-      <footer className="max-w-[1400px] mx-auto px-6 py-6 text-center text-[11px] text-slate-500">
-        VoxDent · Sprachgestützte Befunderfassung · Befundbögen der DGFDT — verwendet gemäß Software-Lizenz der DGFDT
-      </footer>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 font-mono text-xs font-bold transition-all ${
+                processing ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
+                : !active ? 'border-amber-500 bg-amber-50 text-amber-900'
+                : listening ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                : 'border-slate-400 bg-slate-100 text-slate-700'
+              }`}>
+                {processing
+                  ? <><Activity className="w-3 h-3 animate-spin" /><span>parse</span></>
+                  : !active ? <><AlertTriangle className="w-3 h-3" /><span>pausiert</span></>
+                  : listening ? <><Activity className="w-3 h-3" /><span>aktiv</span></>
+                  : <><span className="w-2 h-2 rounded-full bg-slate-500" /><span>idle</span></>
+                }
+              </div>
+
+              <button onClick={resetAll} className="p-2 rounded-lg border-2 border-slate-300 hover:border-slate-500 hover:bg-slate-100" title="Zurücksetzen">
+                <RotateCcw className="w-4 h-4 text-slate-700" />
+              </button>
+
+              <button
+                onClick={toggleListen}
+                disabled={!supportsSpeech}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+                  listening
+                    ? 'bg-rose-600 text-white pulse-mic hover:bg-rose-700'
+                    : supportsSpeech
+                      ? 'bg-cyan-700 text-white hover:bg-cyan-800 shadow-sm'
+                      : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                }`}
+              >
+                {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                <span>{listening ? 'Stop' : supportsSpeech ? 'Mikrofon' : 'n/a'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Live-Transcript */}
+          <div className="border-t border-slate-200 bg-slate-50">
+            <div className="px-6 py-2 flex items-center gap-3 min-h-[40px]">
+              <Volume2 className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              <div className="flex-1 font-mono text-sm">
+                {transcript && <span className="text-slate-900 font-bold">{transcript}</span>}
+                {interim && <span className="text-slate-600 italic"> {interim}</span>}
+                {!transcript && !interim && (
+                  <span className="text-slate-600">
+                    {listening ? 'höre zu — sprich natürlich, Smalltalk wird gefiltert' : 'Mikrofon aus — Demo-Eingaben unten rechts'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Hauptbereich */}
+        <main className={HasAnatomy
+          ? "px-6 py-6 grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 max-w-[1600px] mx-auto"
+          : "px-6 py-6 max-w-[1200px] mx-auto"
+        }>
+          <div className="min-w-0">
+            <ActiveView state={currentState} recentField={recentField} />
+          </div>
+
+          {/* Sticky Anatomie-Panel rechts (nur wenn Form sie hat) */}
+          {HasAnatomy && (
+            <aside className="hidden xl:block">
+              <div className="sticky top-32">
+                <AnatomyComp state={currentState} recentField={recentField} />
+              </div>
+            </aside>
+          )}
+        </main>
+
+        <footer className="px-6 py-6 text-center text-[11px] text-slate-500 max-w-[1200px] mx-auto">
+          VoxDent · Sprachgestützte Befunderfassung · Befundbögen der DGFDT — verwendet gemäß Software-Lizenz der DGFDT
+        </footer>
+      </div>
+
+      {/* Floating Demo+Log Panel */}
+      <FloatingDemoPanel
+        demoText={demoText}
+        setDemoText={setDemoText}
+        submitDemo={submitDemo}
+        processing={processing}
+        demoUtterances={demoUtterances}
+        handleUtterance={handleUtterance}
+        log={log}
+        supportsSpeech={supportsSpeech}
+      />
     </div>
   );
 }

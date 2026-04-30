@@ -4,3 +4,65 @@
 
 html, body { height: 100%; }
 body { margin: 0; }
+
+/* ─── Mikrofon-Pulse beim Aufnehmen ─── */
+@keyframes pulse-mic {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(225, 29, 72, 0); }
+}
+.pulse-mic { animation: pulse-mic 1.6s infinite; }
+
+/* ─── Scan-Pulse für Header-Indikator ─── */
+@keyframes scan-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+.scan-pulse { animation: scan-pulse 2s infinite ease-in-out; }
+
+/* ─── Flash beim Befund-Update ─── */
+@keyframes flash {
+  0% { background-color: rgba(8, 145, 178, 0.25); }
+  100% { background-color: transparent; }
+}
+.animate-flash { animation: flash 1.2s ease-out; }
+
+/* ─── Anatomie: Blink für aktualisierte Punkte ─── */
+@keyframes anatomy-flash {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.6); filter: brightness(1.3); }
+  60% { transform: scale(1.1); }
+}
+.anatomy-flash {
+  animation: anatomy-flash 1.0s ease-out;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* ─── Anatomie: Glow-Aura ─── */
+@keyframes anatomy-glow {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.45; }
+}
+.anatomy-glow {
+  animation: anatomy-glow 2.5s ease-in-out infinite;
+}
+
+/* ─── Anatomie: Pulse für Kiefergelenk-Bereich ─── */
+@keyframes anatomy-pulse {
+  0%, 100% { stroke-width: 2; opacity: 0.7; }
+  50% { stroke-width: 3.5; opacity: 1; }
+}
+.anatomy-pulse {
+  animation: anatomy-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─── Recent-Pulse: kombiniert ─── */
+.recent-pulse circle {
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+/* ─── Smooth scroll für Sidebar ─── */
+.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
