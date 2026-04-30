@@ -6,7 +6,7 @@
 import React from 'react';
 import { TEETH_UPPER, TEETH_LOWER, PATHOLOGY_ITEMS, CHEMICAL_ITEMS, MECHANICAL_ITEMS } from './form';
 
-// ─── HELPER: Zelle für einen Wert (0-4) ────────────────────────
+// ─── Zelle für Verschleißgrad (0-4) ────────────────────────────
 function GradeCell({ value, hot, missing }) {
   if (missing) {
     return (
@@ -31,24 +31,41 @@ function GradeCell({ value, hot, missing }) {
   );
 }
 
-function YesNoIndicator({ value }) {
-  if (value === null || value === undefined) return <span className="text-slate-400 font-mono text-xs">–</span>;
+// ─── Symptom-Zeile mit Checkbox-Optik ──────────────────────────
+function SymptomRow({ item, value, hot }) {
+  const filled = value === true;
+  const explicitNo = value === false;
   return (
-    <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${value ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
-      {value ? 'ja' : 'nein'}
-    </span>
-  );
-}
-
-function SymptomRow({ item, value, hot, summary }) {
-  return (
-    <div className={`flex items-center justify-between gap-2 py-1.5 px-2 rounded ${hot ? 'animate-flash bg-cyan-50' : ''}`}>
-      <span className="text-xs text-slate-700 flex-1">{item.label}</span>
-      <YesNoIndicator value={value} />
+    <div className={`flex items-start gap-2 py-1 px-1.5 rounded transition-colors ${hot ? 'animate-flash bg-cyan-50' : ''}`}>
+      <span className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+        filled ? 'bg-cyan-600 border-cyan-700' :
+        explicitNo ? 'bg-slate-200 border-slate-400' :
+        'bg-white border-slate-300'
+      }`}>
+        {filled && <span className="text-white text-[10px] font-bold leading-none">✓</span>}
+        {explicitNo && <span className="text-slate-500 text-[10px] font-bold leading-none">–</span>}
+      </span>
+      <span className={`text-xs leading-snug ${filled ? 'text-slate-900 font-medium' : 'text-slate-700'}`}>
+        {item.label}
+      </span>
     </div>
   );
 }
 
+// ─── Summen-Box "X / 10" ───────────────────────────────────────
+function SummaryBox({ count, total, recentlyChanged }) {
+  return (
+    <div className={`mt-3 ml-auto inline-flex items-center gap-2 ${recentlyChanged ? 'animate-flash' : ''}`}>
+      <span className="text-[10px] tracking-widest text-slate-700 font-mono font-bold">SUMME</span>
+      <div className="flex items-baseline gap-0.5 px-3 py-1.5 bg-slate-900 text-white rounded-md font-mono font-bold">
+        <span className="text-base">{count}</span>
+        <span className="text-xs text-slate-400">/ {total}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── SectionCard ───────────────────────────────────────────────
 function SectionCard({ num, title, subtitle, children, recentField, fields }) {
   const isHot = fields?.some(f => recentField?.startsWith(f));
   return (
@@ -63,117 +80,178 @@ function SectionCard({ num, title, subtitle, children, recentField, fields }) {
   );
 }
 
-// ─── ZAHN-TABELLE (FDI-Schema) ─────────────────────────────────
+// ─── ZAHN-TABELLE (FDI) ────────────────────────────────────────
+// Sextanten-Definition (DGFDT Original):
+// S1: 18,17,16,15,14 (5 Zähne)
+// S2: 13,12,11,21,22,23 (6 Zähne — gesamte OK-Front)
+// S3: 24,25,26,27,28 (5 Zähne)
+// S4: 34,35,36,37,38 (5 Zähne)
+// S5: 43,42,41,31,32,33 (6 Zähne — gesamte UK-Front, im PDF ist 44 mit drin)
+// S6: 48,47,46,45,44 (5 Zähne)
+const SEXTANT_UPPER = {
+  S1: [18, 17, 16, 15, 14],
+  S2: [13, 12, 11, 21, 22, 23],
+  S3: [24, 25, 26, 27, 28],
+};
+const SEXTANT_LOWER = {
+  S6: [48, 47, 46, 45, 44],
+  S5: [43, 42, 41, 31, 32, 33],
+  S4: [34, 35, 36, 37, 38],
+};
+
 function ToothTable({ form, recentField }) {
   const isHot = (field) => recentField === field;
 
-  const renderRow = (teeth, surface) => (
-    <div className="flex gap-0.5">
-      {teeth.map(t => {
-        const missing = form[`tooth_${t}_missing`] === true;
-        return (
-          <div key={t} className="flex-1 min-w-[28px]">
-            <GradeCell
-              value={form[`tooth_${t}_${surface}`]}
-              hot={isHot(`tooth_${t}_${surface}`) || isHot(`tooth_${t}_missing`)}
-              missing={missing}
-            />
+  // Zelle pro Zahn/Fläche
+  const Cell = ({ tooth, surface }) => {
+    const missing = form[`tooth_${tooth}_missing`] === true;
+    return (
+      <GradeCell
+        value={form[`tooth_${tooth}_${surface}`]}
+        hot={isHot(`tooth_${tooth}_${surface}`) || isHot(`tooth_${tooth}_missing`)}
+        missing={missing}
+      />
+    );
+  };
+
+  // Eine Zeile (Fläche) für einen Kiefer, gegliedert in 3 Sextanten
+  const renderSurfaceRow = (sextants, surface) => (
+    <div className="flex items-center gap-1">
+      {Object.entries(sextants).map(([sextKey, teeth], idx) => (
+        <React.Fragment key={sextKey}>
+          {idx > 0 && <div className="w-0.5 h-7 bg-slate-300 self-stretch" />}
+          <div className="flex gap-0.5 flex-1">
+            {teeth.map(t => (
+              <div key={t} className="flex-1 min-w-[26px]">
+                <Cell tooth={t} surface={surface} />
+              </div>
+            ))}
           </div>
-        );
-      })}
+        </React.Fragment>
+      ))}
     </div>
   );
 
-  const renderToothNumbers = (teeth) => (
-    <div className="flex gap-0.5">
-      {teeth.map(t => (
-        <div key={t} className="flex-1 min-w-[28px] text-center">
-          <span className="text-[10px] font-mono font-bold text-slate-700">{t}</span>
-        </div>
+  // Zahn-Nummern-Reihe
+  const renderToothNumbers = (sextants) => (
+    <div className="flex items-center gap-1">
+      {Object.entries(sextants).map(([sextKey, teeth], idx) => (
+        <React.Fragment key={sextKey}>
+          {idx > 0 && <div className="w-0.5 h-5 bg-slate-300 self-stretch" />}
+          <div className="flex gap-0.5 flex-1">
+            {teeth.map(t => (
+              <div key={t} className="flex-1 min-w-[26px] text-center">
+                <span className="text-[10px] font-mono font-bold text-slate-700">{t}</span>
+              </div>
+            ))}
+          </div>
+        </React.Fragment>
+      ))}
+    </div>
+  );
+
+  // Sextanten-Header (proportional zu den Zahnzahlen)
+  const renderSextantHeader = (sextants, labels) => (
+    <div className="flex items-center gap-1">
+      {Object.entries(sextants).map(([sextKey, teeth], idx) => (
+        <React.Fragment key={sextKey}>
+          {idx > 0 && <div className="w-0.5" />}
+          <div className="flex-1 text-center bg-slate-100 border border-slate-300 py-1 rounded"
+               style={{ flex: teeth.length }}>
+            <span className="text-[10px] font-mono font-bold text-slate-700 tracking-wide">
+              {labels[sextKey]}
+            </span>
+          </div>
+        </React.Fragment>
       ))}
     </div>
   );
 
   const SurfaceLabel = ({ children }) => (
-    <div className="text-[10px] tracking-widest text-slate-600 font-mono font-bold w-20 text-right pr-2">{children}</div>
+    <div className="text-[10px] tracking-widest text-slate-600 font-mono font-bold w-24 text-right pr-2">
+      {children}
+    </div>
+  );
+
+  const KieferLabel = ({ children }) => (
+    <div className="w-24 text-right pr-2">
+      <span className="text-[11px] font-bold text-cyan-700">{children}</span>
+    </div>
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1.5">
+      {/* === OBERKIEFER === */}
+
       {/* Sextanten-Header oben */}
-      <div className="flex gap-0.5 text-[10px] font-mono font-bold text-slate-500">
-        <div className="w-20"></div>
-        <div className="flex-1 min-w-[140px] text-center bg-slate-50 py-1 rounded">SEXTANT 1</div>
-        <div className="flex-1 min-w-[170px] text-center bg-slate-50 py-1 rounded">SEXTANT 2</div>
-        <div className="flex-1 min-w-[140px] text-center bg-slate-50 py-1 rounded">SEXTANT 3</div>
-      </div>
-
-      {/* OBERKIEFER */}
-      <div className="space-y-1.5">
-        <div className="flex gap-2 items-center">
-          <SurfaceLabel>bukkal</SurfaceLabel>
-          {renderRow(TEETH_UPPER, 'buccal')}
-        </div>
-        <div className="flex gap-2 items-center">
-          <SurfaceLabel>okkl./inz.</SurfaceLabel>
-          {renderRow(TEETH_UPPER, 'occlusal')}
-        </div>
-        <div className="flex gap-2 items-center">
-          <SurfaceLabel>palatinal</SurfaceLabel>
-          {renderRow(TEETH_UPPER, 'palatal')}
-        </div>
-        <div className="flex gap-2 items-center pt-1">
-          <div className="w-20 text-right pr-2 text-[10px] tracking-widest text-cyan-700 font-mono font-bold">OK</div>
-          {renderToothNumbers(TEETH_UPPER)}
+      <div className="flex items-center gap-1">
+        <div className="w-24"></div>
+        <div className="flex-1">
+          {renderSextantHeader(SEXTANT_UPPER, { S1: 'Sextant 1', S2: 'Sextant 2', S3: 'Sextant 3' })}
         </div>
       </div>
 
-      {/* Trennstrich */}
-      <div className="border-t-2 border-dashed border-slate-300"></div>
+      {/* OK Flächen-Zeilen */}
+      <div className="flex items-center gap-1">
+        <SurfaceLabel>bukkal</SurfaceLabel>
+        <div className="flex-1">{renderSurfaceRow(SEXTANT_UPPER, 'buccal')}</div>
+      </div>
+      <div className="flex items-center gap-1">
+        <SurfaceLabel>okklusal/inzisal</SurfaceLabel>
+        <div className="flex-1">{renderSurfaceRow(SEXTANT_UPPER, 'occlusal')}</div>
+      </div>
+      <div className="flex items-center gap-1">
+        <SurfaceLabel>palatinal</SurfaceLabel>
+        <div className="flex-1">{renderSurfaceRow(SEXTANT_UPPER, 'palatal')}</div>
+      </div>
 
-      {/* UNTERKIEFER */}
-      <div className="space-y-1.5">
-        <div className="flex gap-2 items-center">
-          <div className="w-20 text-right pr-2 text-[10px] tracking-widest text-cyan-700 font-mono font-bold">UK</div>
-          {renderToothNumbers(TEETH_LOWER)}
-        </div>
-        <div className="flex gap-2 items-center">
-          <SurfaceLabel>lingual</SurfaceLabel>
-          {renderRow(TEETH_LOWER, 'palatal')}
-        </div>
-        <div className="flex gap-2 items-center">
-          <SurfaceLabel>okkl./inz.</SurfaceLabel>
-          {renderRow(TEETH_LOWER, 'occlusal')}
-        </div>
-        <div className="flex gap-2 items-center">
-          <SurfaceLabel>bukkal</SurfaceLabel>
-          {renderRow(TEETH_LOWER, 'buccal')}
-        </div>
+      {/* OK Zahnnummern */}
+      <div className="flex items-center gap-1 pt-1">
+        <KieferLabel>Oberkiefer</KieferLabel>
+        <div className="flex-1">{renderToothNumbers(SEXTANT_UPPER)}</div>
+      </div>
+
+      {/* Trennlinie zwischen OK und UK */}
+      <div className="border-t-2 border-slate-400 my-2"></div>
+
+      {/* UK Zahnnummern */}
+      <div className="flex items-center gap-1">
+        <KieferLabel>Unterkiefer</KieferLabel>
+        <div className="flex-1">{renderToothNumbers(SEXTANT_LOWER)}</div>
+      </div>
+
+      {/* UK Flächen-Zeilen */}
+      <div className="flex items-center gap-1">
+        <SurfaceLabel>lingual</SurfaceLabel>
+        <div className="flex-1">{renderSurfaceRow(SEXTANT_LOWER, 'palatal')}</div>
+      </div>
+      <div className="flex items-center gap-1">
+        <SurfaceLabel>okklusal/inzisal</SurfaceLabel>
+        <div className="flex-1">{renderSurfaceRow(SEXTANT_LOWER, 'occlusal')}</div>
+      </div>
+      <div className="flex items-center gap-1">
+        <SurfaceLabel>bukkal</SurfaceLabel>
+        <div className="flex-1">{renderSurfaceRow(SEXTANT_LOWER, 'buccal')}</div>
       </div>
 
       {/* Sextanten-Header unten */}
-      <div className="flex gap-0.5 text-[10px] font-mono font-bold text-slate-500">
-        <div className="w-20"></div>
-        <div className="flex-1 min-w-[140px] text-center bg-slate-50 py-1 rounded">SEXTANT 6</div>
-        <div className="flex-1 min-w-[170px] text-center bg-slate-50 py-1 rounded">SEXTANT 5</div>
-        <div className="flex-1 min-w-[140px] text-center bg-slate-50 py-1 rounded">SEXTANT 4</div>
+      <div className="flex items-center gap-1 pt-1">
+        <div className="w-24"></div>
+        <div className="flex-1">
+          {renderSextantHeader(SEXTANT_LOWER, { S6: 'Sextant 6', S5: 'Sextant 5', S4: 'Sextant 4' })}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── SYMPTOM-LISTE ─────────────────────────────────────────────
-function SymptomList({ items, form, recentField, title, summary }) {
-  const filledCount = items.filter(i => form[i.key] === true).length;
-  const totalAnswered = items.filter(i => form[i.key] !== null && form[i.key] !== undefined).length;
+// ─── SYMPTOM-LISTE mit Summen-Box ──────────────────────────────
+function SymptomContainer({ items, form, recentField }) {
+  const positiveCount = items.filter(i => form[i.key] === true).length;
+  const recentInThis = items.some(i => i.key === recentField);
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-200">
-        <h4 className="text-sm font-bold text-slate-800">{title}</h4>
-        <span className="text-[10px] font-mono text-slate-600">
-          {filledCount}/{items.length} positiv · {totalAnswered}/{items.length} erfasst
-        </span>
-      </div>
       <div className="space-y-0.5">
         {items.map(item => (
           <SymptomRow
@@ -184,6 +262,141 @@ function SymptomList({ items, form, recentField, title, summary }) {
           />
         ))}
       </div>
+      <div className="flex justify-end">
+        <SummaryBox count={positiveCount} total={items.length} recentlyChanged={recentInThis} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Patientenkopf-Feld ────────────────────────────────────────
+function PatientField({ label, value, hot }) {
+  return (
+    <div className={`bg-slate-50 rounded-md p-2 border ${hot ? 'border-cyan-400 animate-flash' : 'border-slate-200'}`}>
+      <div className="text-[9px] tracking-widest text-slate-600 font-mono font-bold uppercase mb-0.5">{label}</div>
+      <div className={`text-sm font-medium ${value ? 'text-slate-900' : 'text-slate-400 italic'}`}>
+        {value || 'noch nicht erfasst'}
+      </div>
+    </div>
+  );
+}
+
+// ─── Auto-Auswertung (TWES 2.0 Logik) ──────────────────────────
+function evaluateStatus(form) {
+  // Höchster Verschleiß-Grad pro Zahn
+  const allTeeth = [...TEETH_UPPER, ...TEETH_LOWER];
+  const toothMaxGrade = {};
+  let highestGrade = 0;
+  allTeeth.forEach(t => {
+    if (form[`tooth_${t}_missing`] === true) return;
+    const grades = [
+      form[`tooth_${t}_buccal`],
+      form[`tooth_${t}_occlusal`],
+      form[`tooth_${t}_palatal`],
+    ].filter(v => v !== null && v !== undefined);
+    if (grades.length > 0) {
+      const max = Math.max(...grades);
+      toothMaxGrade[t] = max;
+      if (max > highestGrade) highestGrade = max;
+    }
+  });
+
+  // Generalisierung: Sextanten mit Grad ≥ 3 (erheblich)
+  const sextantsWithSevere = new Set();
+  allTeeth.forEach(t => {
+    const max = toothMaxGrade[t];
+    if (max !== undefined && max >= 3) {
+      // Sextant bestimmen
+      let sextant;
+      if (t >= 14 && t <= 18) sextant = 1;
+      else if ((t >= 11 && t <= 13) || (t >= 21 && t <= 23)) sextant = 2;
+      else if (t >= 24 && t <= 28) sextant = 3;
+      else if (t >= 34 && t <= 38) sextant = 4;
+      else if ((t >= 31 && t <= 33) || (t >= 41 && t <= 43)) sextant = 5;
+      else if (t >= 44 && t <= 48) sextant = 6;
+      if (sextant) sextantsWithSevere.add(sextant);
+    }
+  });
+
+  const distribution = sextantsWithSevere.size >= 3 ? 'generalisiert' :
+                       sextantsWithSevere.size > 0 ? 'lokalisiert' : null;
+
+  // Pathologie-Auswertung
+  const pathologyCount = PATHOLOGY_ITEMS.filter(i => form[i.key] === true).length;
+  const isPathological = highestGrade >= 2 && pathologyCount >= 1;
+
+  // Ätiologie-Auswertung
+  const chemCount = CHEMICAL_ITEMS.filter(i => form[i.key] === true).length;
+  const mechCount = MECHANICAL_ITEMS.filter(i => form[i.key] === true).length;
+  const chemMajority = chemCount >= 5;
+  const mechMajority = mechCount >= 5;
+
+  let etiology;
+  if (chemMajority && mechMajority) etiology = 'beide gleichermaßen';
+  else if (chemMajority && !mechMajority) etiology = 'überwiegend chemisch';
+  else if (!chemMajority && mechMajority) etiology = 'überwiegend mechanisch';
+  else if (chemCount > 0 && mechCount > 0) etiology = 'beide teilweise';
+  else if (chemCount > 0) etiology = 'teilweise chemisch';
+  else if (mechCount > 0) etiology = 'teilweise mechanisch';
+  else etiology = null;
+
+  return {
+    highestGrade,
+    distribution,
+    pathologyCount,
+    isPathological,
+    chemCount,
+    mechCount,
+    etiology,
+  };
+}
+
+function AutoEvaluation({ form }) {
+  const ev = evaluateStatus(form);
+  const gradeNames = ['kein', 'mild', 'moderat', 'erheblich', 'extrem'];
+
+  const hasAnyData = ev.highestGrade > 0 || ev.pathologyCount > 0 || ev.chemCount > 0 || ev.mechCount > 0;
+
+  if (!hasAnyData) {
+    return (
+      <div className="text-sm text-slate-500 italic text-center py-2">
+        Auswertung erscheint sobald Befunde erfasst werden
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="bg-slate-50 rounded-md p-2 border border-slate-200">
+          <div className="text-[9px] tracking-widest text-slate-600 font-mono font-bold mb-0.5">HÖCHSTER GRAD</div>
+          <div className="text-sm font-bold text-slate-900">
+            {ev.highestGrade} <span className="text-xs text-slate-600 font-normal">({gradeNames[ev.highestGrade]})</span>
+          </div>
+        </div>
+        <div className="bg-slate-50 rounded-md p-2 border border-slate-200">
+          <div className="text-[9px] tracking-widest text-slate-600 font-mono font-bold mb-0.5">VERTEILUNG</div>
+          <div className="text-sm font-bold text-slate-900">
+            {ev.distribution || <span className="text-slate-400 font-normal italic text-xs">–</span>}
+          </div>
+        </div>
+        <div className={`rounded-md p-2 border ${ev.isPathological ? 'bg-rose-50 border-rose-300' : 'bg-emerald-50 border-emerald-300'}`}>
+          <div className="text-[9px] tracking-widest text-slate-600 font-mono font-bold mb-0.5">PATHOLOGIE</div>
+          <div className={`text-sm font-bold ${ev.isPathological ? 'text-rose-800' : 'text-emerald-800'}`}>
+            {ev.isPathological ? 'pathologisch' : 'nicht-pathologisch'}
+          </div>
+        </div>
+        <div className="bg-slate-50 rounded-md p-2 border border-slate-200">
+          <div className="text-[9px] tracking-widest text-slate-600 font-mono font-bold mb-0.5">ÄTIOLOGIE</div>
+          <div className="text-sm font-bold text-slate-900">
+            {ev.etiology || <span className="text-slate-400 font-normal italic text-xs">–</span>}
+          </div>
+        </div>
+      </div>
+      <div className="text-[10px] font-mono text-slate-500 leading-relaxed">
+        Logik: Höchster Wert pro Zahn → höchster Gesamtgrad. Generalisierung wenn ≥ 3 Sextanten Grad ≥ 3.
+        Pathologisch wenn Grad ≥ 2 UND ≥ 1 Pathologie-Item. Ätiologie über 50%-Schwelle pro Container.
+      </div>
     </div>
   );
 }
@@ -191,6 +404,7 @@ function SymptomList({ items, form, recentField, title, summary }) {
 // ─── HAUPT-VIEW ────────────────────────────────────────────────
 export function View({ state, recentField }) {
   const form = state || {};
+  const isHot = (f) => recentField === f;
 
   return (
     <div className="max-w-5xl mx-auto space-y-4">
@@ -211,42 +425,56 @@ export function View({ state, recentField }) {
         </div>
       </div>
 
-      {/* SEKTION 1: VERSCHLEISSGRADE PRO ZAHN */}
+      {/* PATIENTENKOPF */}
+      <div className="bg-white border-2 border-slate-200 rounded-xl p-4">
+        <div className="text-[10px] tracking-widest text-cyan-700 font-mono font-bold mb-3">PATIENTENDATEN</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <PatientField label="Patientennummer" value={form.patient_number} hot={isHot('patient_number')} />
+          <PatientField label="Name, Vorname" value={form.patient_name} hot={isHot('patient_name')} />
+          <PatientField label="Geburtsdatum" value={form.birth_date} hot={isHot('birth_date')} />
+          <PatientField label="Untersuchungsdatum" value={form.examination_date} hot={isHot('examination_date')} />
+        </div>
+      </div>
+
+      {/* SEKTION 1: VERSCHLEISSGRADE */}
       <SectionCard num="1" title="Verschleißgrade" subtitle="Pro Zahn und Fläche · TWES 2.0 Skala 0–4"
         recentField={recentField} fields={['tooth_']}>
         <ToothTable form={form} recentField={recentField} />
       </SectionCard>
 
-      {/* SEKTION 2: PATHOLOGIE-ITEMS */}
+      {/* SEKTION 2: PATHOLOGIE */}
       <SectionCard num="2" title="Anzeichen pathologischen Zahnverschleiß"
-        subtitle="10 Indikatoren — bestimmt die Pathologie-Bewertung"
+        subtitle="10 Indikatoren — bestimmen die Pathologie-Bewertung"
         recentField={recentField} fields={['pat_']}>
-        <SymptomList items={PATHOLOGY_ITEMS} form={form} recentField={recentField}
-          title="Pathologie-Indikatoren" />
+        <SymptomContainer items={PATHOLOGY_ITEMS} form={form} recentField={recentField} />
       </SectionCard>
 
-      {/* SEKTION 3 + 4: ÄTIOLOGIE — zwei Spalten */}
+      {/* SEKTION 3 + 4: ÄTIOLOGIE */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <SectionCard num="3" title="Chemische Faktoren"
-          subtitle="≥ 50% positiv = chemisch überwiegend"
+          subtitle="≥ 5 von 10 = überwiegend chemisch"
           recentField={recentField} fields={['chem_']}>
-          <SymptomList items={CHEMICAL_ITEMS} form={form} recentField={recentField}
-            title="Chemie-Indikatoren" />
+          <SymptomContainer items={CHEMICAL_ITEMS} form={form} recentField={recentField} />
         </SectionCard>
 
         <SectionCard num="4" title="Mechanische Faktoren"
-          subtitle="≥ 50% positiv = mechanisch überwiegend"
+          subtitle="≥ 5 von 10 = überwiegend mechanisch"
           recentField={recentField} fields={['mech_']}>
-          <SymptomList items={MECHANICAL_ITEMS} form={form} recentField={recentField}
-            title="Mechanik-Indikatoren" />
+          <SymptomContainer items={MECHANICAL_ITEMS} form={form} recentField={recentField} />
         </SectionCard>
       </div>
 
-      {/* SEKTION 5: DIAGNOSE */}
-      <SectionCard num="5" title="Diagnose"
+      {/* AUTO-AUSWERTUNG */}
+      <SectionCard num="5" title="Auswertung" subtitle="Automatische TWES-2.0-Logik"
+        recentField={recentField} fields={['pat_', 'chem_', 'mech_', 'tooth_']}>
+        <AutoEvaluation form={form} />
+      </SectionCard>
+
+      {/* DIAGNOSE */}
+      <SectionCard num="6" title="Diagnose"
         subtitle="Vier Bausteine: generalisierter Grad · lokalisierter Grad · Pathologie · Ätiologie"
         recentField={recentField} fields={['diagnosis']}>
-        <div className={`min-h-[80px] p-3 rounded-md border-2 ${recentField === 'diagnosis' ? 'border-cyan-400 bg-cyan-50 animate-flash' : 'border-slate-200 bg-slate-50'}`}>
+        <div className={`min-h-[100px] p-3 rounded-md border-2 ${recentField === 'diagnosis' ? 'border-cyan-400 bg-cyan-50 animate-flash' : 'border-slate-200 bg-slate-50'}`}>
           {form.diagnosis ? (
             <p className="text-sm text-slate-900 whitespace-pre-wrap">{form.diagnosis}</p>
           ) : (

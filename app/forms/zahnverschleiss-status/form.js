@@ -77,6 +77,12 @@ export function getInitial() {
   });
 
   return {
+    // Patientenkopf
+    patient_number: null,
+    patient_name: null,
+    birth_date: null,
+    examination_date: null,
+
     ...tooth,
     ...items,
     diagnosis: null,
